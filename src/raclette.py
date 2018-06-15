@@ -95,6 +95,7 @@ for locations, date_tracks in track_bins.iteritems():
             results[str(locations)]["median"].append(np.median(diffrtt))
             results[str(locations)]["nb_samples"].append(len(diffrtt))
 
+        # TODO move this somewhere else
         dates.append(date*window_size)
             
 
