@@ -4,7 +4,7 @@ import datetime
 from collections import defaultdict
 import cPickle as pickle
 import ConfigParser
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue
 
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
