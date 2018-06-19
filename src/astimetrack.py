@@ -30,6 +30,8 @@ class ASTimeTrack():
                     if res["from"] != router_ip:
                         router_ip = res["from"]    
                         router_asn = self.i2a.ip2asn(router_ip)
+                        if router_asn == "unknown":
+                            router_asn = router_ip
                     
                     idx = -1
                     if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != router_asn:

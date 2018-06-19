@@ -90,5 +90,6 @@ with AtlasRestReader(atlas_start, atlas_stop, atlas_msm_ids, atlas_probe_ids, ch
 
 tm.collect_results(results, dates, force_expiration=0.5)
 
+logging.warn("Saving results on disk")
 pickle.dump(results, open("results.pickle", "wb"))
 pickle.dump(dates, open("dates.pickle", "wb"))
