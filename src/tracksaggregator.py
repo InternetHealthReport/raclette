@@ -61,7 +61,7 @@ class TracksAggregator():
 
         if self.nb_tracks % self.expiration == 0 or force_expiration:
 
-            logging.warn("Running results collection")
+            logging.debug("Running results collection")
             expired_bins = []
             for date, tracks in self.track_bins.iteritems():
 

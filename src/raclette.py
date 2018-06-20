@@ -15,6 +15,7 @@ from astimetrack import ASTimeTrack
 from tracksaggregator import TracksAggregator
 
 
+
 def defaultdictlist(): 
     return defaultdict(list)
 
@@ -53,6 +54,7 @@ logging.warn("Started on {}".format(datetime.datetime.today()))
 # Initialisation
 sys.path.append(ip2asn_dir)
 import ip2asn
+
 i2a = ip2asn.ip2asn(ip2asn_db)
 fhtt = FirstHopTimeTrack(i2a)
 astt = ASTimeTrack(i2a)
@@ -78,14 +80,14 @@ with AtlasRestReader(atlas_start, atlas_stop, astt, atlas_msm_ids, atlas_probe_i
         tm.add_track(track) 
         tm.collect_results(results, dates)
 
-        if nb_total_traceroutes % tm_expiration == 0:
-            logging.warn("Total number of traceroute: {}\nTotal number of tracks: {} ({} expired, {} ignored, {} empty)".format(nb_total_traceroutes, tm.nb_tracks, tm.nb_expired_tracks, tm.nb_ignored_tracks, tm.nb_empty_tracks))
+        # if nb_total_traceroutes % tm_expiration == 0:
+            # logging.warn("Total number of traceroute: {}\nTotal number of tracks: {} ({} expired, {} ignored, {} empty)".format(nb_total_traceroutes, tm.nb_tracks, tm.nb_expired_tracks, tm.nb_ignored_tracks, tm.nb_empty_tracks))
 
 logging.warn("Finished to read data {}".format(datetime.datetime.today()))
 tm.collect_results(results, dates, force_expiration=0.5)
 
-logging.warn("Saving results on disk")
-pickle.dump(results, open("results.pickle", "wb"))
-pickle.dump(dates, open("dates.pickle", "wb"))
+# logging.warn("Saving results on disk")
+# pickle.dump(results, open("results.pickle", "wb"))
+# pickle.dump(dates, open("dates.pickle", "wb"))
 
 logging.warn("Ended on {}".format(datetime.datetime.today()))
