@@ -5,23 +5,31 @@ import itertools
 from multiprocessing import Pool
 from ripe.atlas.cousteau import AtlasResultsRequest
 
+TT_CONVERTER = None
 
 def get_results(kwargs):
+
+    global TT_CONVERTER
 
     logging.debug("Requesting results for {}".format(kwargs))
     is_success, results = AtlasResultsRequest(**kwargs).create()
 
     if is_success:
-        return results
+        return map(TT_CONVERTER.traceroute2timetrack,results)
     else:
+        logging.error("Atlas request failed for {}".format(kwargs))
         return None
 
 
 class AtlasRestReader():
 
-    def __init__(self, start, end, msm_ids=[5001,5004,5005], probe_ids=[1,2,3,4,5,6,7,8], 
-            chunk_size=900, pool=None):
-        self.pool = Pool(processes=1) if pool is None else pool
+    def __init__(self, start, end, timetrack_converter, msm_ids=[5001,5004,5005], 
+            probe_ids=[1,2,3,4,5,6,7,8], chunk_size=900):
+
+        global TT_CONVERTER
+        TT_CONVERTER = timetrack_converter 
+
+        self.pool = Pool(processes=12) 
         self.msm_ids = msm_ids
         self.probe_ids = probe_ids
         self.start = start

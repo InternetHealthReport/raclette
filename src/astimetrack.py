@@ -15,6 +15,10 @@ class ASTimeTrack():
             logging.warning("No probe ID given: %s" % trace)
             return None
 
+        # Check if the traceroute is valid
+        if trace is None or "error" in trace["result"][0] or "err" in trace["result"][0]["result"]:
+            return None
+
         timetrack = {"prb_id": trace["prb_id"], "msm_id": trace["msm_id"], 
                 "timestamp":trace["timestamp"], "rtts":[]}
 

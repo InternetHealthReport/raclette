@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import combinations, product
 
 
-class TracksManager():
+class TracksAggregator():
 
     def __init__(self, window_size, expiration):
         self.window_size = window_size
