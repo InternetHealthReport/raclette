@@ -10,3 +10,12 @@ def isPrivateIP(ip):
 
     return priv_lo.match(ip) or priv_24.match(ip) or priv_20.match(ip) or priv_16.match(ip)
 
+def defaultdictlist(): 
+    return defaultdict(list)
+
+def valid_date(s):
+    try:
+        return datetime.datetime.strptime(s+"UTC", "%Y-%m-%dT%H:%M%Z")
+    except ValueError:
+        msg = "Not a valid date: '{0}'. Accepted format is YYYY-MM-DDThh:mm, for example 2018-06-01T00:00".format(s)
+        raise argparse.ArgumentTypeError(msg)

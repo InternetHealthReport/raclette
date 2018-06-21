@@ -8,6 +8,7 @@ import ConfigParser
 import argparse
 from multiprocessing import Process, Pool, JoinableQueue, Pipe
 
+import tools
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
 
@@ -19,17 +20,6 @@ from delaychangedetector import DelayChangeDetector
 from sqlitesaver import SQLiteSaver
 
 
-def defaultdictlist(): 
-    return defaultdict(list)
-
-
-def valid_date(s):
-    try:
-        return datetime.datetime.strptime(s+"UTC", "%Y-%m-%dT%H:%M%Z")
-    except ValueError:
-        msg = "Not a valid date: '{0}'. Accepted format is YYYY-MM-DDThh:mm, for example 2018-06-01T00:00".format(s)
-        raise argparse.ArgumentTypeError(msg)
-
 parser = argparse.ArgumentParser()
 parser.add_argument("-C","--config_file", help="Get all parameters from the specified config file", type=str, default="conf/raclette.conf")
 args = parser.parse_args()
@@ -38,8 +28,8 @@ args = parser.parse_args()
 config = ConfigParser.ConfigParser()
 config.read(args.config_file)
 
-atlas_start =  valid_date(config.get("io", "start"))
-atlas_stop =  valid_date(config.get("io", "stop"))
+atlas_start =  tools.valid_date(config.get("io", "start"))
+atlas_stop =  tools.valid_date(config.get("io", "stop"))
 atlas_msm_ids =  [int(x) for x in config.get("io", "msm_ids").split(",") if x]
 atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if x]
 atlas_chunk_size = int(config.get("io","chunk_size"))
@@ -81,7 +71,6 @@ saver_sqlite = Process(target=SQLiteSaver, args=(saver_filename, saverQueue))
 saver_sqlite.start()
 detector_delay.start()
 
-
 sys.path.append(ip2asn_dir)
 import ip2asn
 
@@ -91,7 +80,7 @@ astt = ASTimeTrack(i2a)
 tm = TracksAggregator(tm_window_size, tm_expiration)
 nb_total_traceroutes = 0
 
-results = defaultdict(defaultdictlist)
+results = defaultdict(tools.defaultdictlist)
 dates = []
 
 with AtlasRestReader(atlas_start, atlas_stop, astt, atlas_msm_ids, atlas_probe_ids, 
@@ -110,16 +99,11 @@ with AtlasRestReader(atlas_start, atlas_stop, astt, atlas_msm_ids, atlas_probe_i
         tm.add_track(track) 
         tm.collect_results(results, dates)
 
-
-
-        # if nb_total_traceroutes % tm_expiration == 0:
-            # logging.warn("Total number of traceroute: {}\nTotal number of tracks: {} ({} expired, {} ignored, {} empty)".format(nb_total_traceroutes, tm.nb_tracks, tm.nb_expired_tracks, tm.nb_ignored_tracks, tm.nb_empty_tracks))
-
-logging.warn("Finished to read data {}".format(datetime.datetime.today()))
+logging.info("Finished to read data {}".format(datetime.datetime.today()))
 tm.collect_results(results, dates, force_expiration=0.5)
 
 # logging.warn("Saving results on disk")
 # pickle.dump(results, open("results.pickle", "wb"))
 # pickle.dump(dates, open("dates.pickle", "wb"))
 
-logging.warn("Ended on {}".format(datetime.datetime.today()))
+logging.info("Ended on {}".format(datetime.datetime.today()))
