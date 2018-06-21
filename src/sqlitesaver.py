@@ -1,37 +1,39 @@
 import apsw
-import threading
+import multiprocessing
 import logging
 
-class SQLiteSaver(threading.Thread):
+class SQLiteSaver(multiprocessing.Process):
 
     """Dumps variables to a SQLite database. """
 
-    def __init__(self, filename, saverQueue):
-        threading.Thread.__init__(self)
+    def __init__(self, filename, saver_queue):
+        multiprocessing.Process.__init__(self)
        
+        logging.warn("Init saver")
         self.filename = filename
         self.conn = apsw.Connection(filename)
         self.cursor = self.conn.cursor()
-        self.saverQueue = saverQueue
+        self.saver_queue = saver_queue
         self.expid = None
         self.prevts = -1
+        logging.warn("End init saver")
 
 
     def run(self):
 
+        logging.info("Started saver")
         self.createdb()
         
         while True:
-            elem = self.saverQueue.get()
+            elem = self.saver_queue.get()
             if isinstance(elem, str) and elem.endswith(";"):
                 self.cursor.execute(elem)
             else:
                 self.save(elem)
-            self.saverQueue.task_done()
-
+            self.saver_queue.task_done()
 
     def createdb(self):
-        logging.warn("Creating databases")
+        logging.info("Creating databases")
         # Table storing experiements parameters
         self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment (id integer primary key, date text, cmd text, args text)")
 
@@ -42,7 +44,7 @@ class SQLiteSaver(threading.Thread):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON diffrtt (endpoint)")
 
         # Table storing anomalous delay changes
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayanomaly (ts integer, startpoint text, endpoint text, median real, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayanomaly (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON delayanomaly (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON delayanomaly (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON delayanomaly (endpoint)")
@@ -71,7 +73,7 @@ class SQLiteSaver(threading.Thread):
 
             if self.prevts != ts:
                 self.prevts = ts
-                logging.debug("start recording differential RTTs")
+                logging.info("start recording differential RTTs")
             
             self.cursor.execute("INSERT INTO diffrtt(ts, startpoint, endpoint, median, confhigh, conflow, expid) VALUES (?, ?, ?, ?, ?, ?, ?)", (ts, startpoint, endpoint, median, high, low, self.expid) )
                     # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )

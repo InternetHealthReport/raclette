@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from collections import defaultdict 
 from itertools import combinations, product
+import tools
 
 
 class TracksAggregator():
@@ -38,7 +39,8 @@ class TracksAggregator():
         self.bins_last_insert[bin_id] = self.nb_tracks
 
 
-    def compute_median_diff_rtt(self, tracks, results):
+    def compute_median_diff_rtt(self, tracks):
+        results = defaultdict(dict)
         diffrtt = defaultdict(list)
         for track in tracks:
             for locPair in combinations(track["rtts"],2):
@@ -51,18 +53,23 @@ class TracksAggregator():
         if len(diffrtt):
             for locations, dr in diffrtt.iteritems():
                 dra = np.array(dr, copy=False)
-                results[str(locations)]["median"].append(np.median(dra))
-                results[str(locations)]["nb_samples"].append(len(dra))
+                results[locations]["median"] = np.median(dra)
+                results[locations]["nb_samples"] = len(dra)
 
-    def collect_results(self, results, dates, force_expiration=0):
+        return results
+
+    def aggregate(self, force_expiration=0):
         """Find expired track bins, that is bins that are not affected by the 
         last n track insertions (n=self.expiration). And compute median differential
         RTTs, number of sample, etc.. for expired bins. """
+
+        results = {} 
 
         if self.nb_tracks % self.expiration == 0 or force_expiration:
 
             logging.debug("Running results collection")
             expired_bins = []
+
             for date, tracks in self.track_bins.iteritems():
 
                 # TODO: add probe diversity
@@ -76,8 +83,7 @@ class TracksAggregator():
                     logging.warn("Processing bin {}".format(date))
                     expired_bins.append(date)
 
-                    self.compute_median_diff_rtt(tracks, results)
-                    dates.append(date*self.window_size+self.window_size/2)
+                    results[date*self.window_size+self.window_size/2] = self.compute_median_diff_rtt(tracks)
                     self.nb_expired_tracks += len(tracks)
                     self.nb_expired_bins += 1
 
@@ -85,5 +91,7 @@ class TracksAggregator():
             for date in expired_bins:
                 self.bins_last_insert[date] = None 
                 del self.track_bins[date]
+
+        return results
 
 
