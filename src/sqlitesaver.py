@@ -16,7 +16,6 @@ class SQLiteSaver(threading.Thread):
         self.expid = None
         self.prevts = -1
 
-        self.run()
 
     def run(self):
 
@@ -32,6 +31,7 @@ class SQLiteSaver(threading.Thread):
 
 
     def createdb(self):
+        logging.warn("Creating databases")
         # Table storing experiements parameters
         self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment (id integer primary key, date text, cmd text, args text)")
 

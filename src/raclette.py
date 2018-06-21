@@ -1,10 +1,12 @@
 import sys
+import os
 import logging
 import datetime
 from collections import defaultdict
 import cPickle as pickle
 import ConfigParser
-from multiprocessing import Pool, JoinableQueue
+import argparse
+from multiprocessing import Process, Pool, JoinableQueue, Pipe
 
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
@@ -28,20 +30,22 @@ def valid_date(s):
         msg = "Not a valid date: '{0}'. Accepted format is YYYY-MM-DDThh:mm, for example 2018-06-01T00:00".format(s)
         raise argparse.ArgumentTypeError(msg)
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-C","--config_file", help="Get all parameters from the specified config file", type=str, default="conf/raclette.conf")
+args = parser.parse_args()
 
 # Read the config file
 config = ConfigParser.ConfigParser()
-config.read("conf/raclette.conf")
+config.read(args.config_file)
 
+atlas_start =  valid_date(config.get("io", "start"))
+atlas_stop =  valid_date(config.get("io", "stop"))
+atlas_msm_ids =  [int(x) for x in config.get("io", "msm_ids").split(",") if x]
+atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if x]
+atlas_chunk_size = int(config.get("io","chunk_size"))
 
-atlas_start =  valid_date(config.get("traceroute", "start"))
-atlas_stop =  valid_date(config.get("traceroute", "stop"))
-atlas_msm_ids =  [int(x) for x in config.get("traceroute", "msm_ids").split(",") if x]
-atlas_probe_ids =  [int(x) for x in config.get("traceroute", "probe_ids").split(",") if x]
-atlas_chunk_size = int(config.get("traceroute","chunk_size"))
-
-dump_name =  config.get("traceroute", "dump_file")
-dump_filter =  config.get("traceroute", "filter")
+dump_name =  config.get("io", "dump_file")
+dump_filter =  config.get("io", "filter")
 
 add_probe = config.get("timetrack", "add_probe")
 
@@ -51,14 +55,33 @@ ip2asn_db = config.get("lib", "ip2asn_db")
 tm_expiration = int(config.get("tracksaggregator", "expiration"))
 tm_window_size = int(config.get("tracksaggregator", "window_size"))
 
-logging.warn("Started on {}".format(datetime.datetime.today()))
+saver_filename = config.get("io", "results")
+log_filename = config.get("io", "log")
+
+# Create output directories
+for fname in [saver_filename, log_filename]:
+    dname = fname.rpartition("/")[0]
+    if not os.path.exists(dname):
+        os.makedirs(dname)
+
 # Initialisation
+FORMAT = '%(asctime)s %(processName)s %(message)s'
+logging.basicConfig(format=FORMAT, filename=log_filename, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+logging.info("Started: %s" % sys.argv)
+logging.info("Arguments: %s" % args)
+for sec in config.sections():
+    logging.info("Config: [%s] %s" % (sec,config.items(sec,False)))
+
 saverQueue = JoinableQueue(10000)
 detectorPipe = Pipe(False)
 
-dcd = Process(target=DelayChangeDetector, args=(detectorPipe[0], saverQueue))
-sls = Process(target=SQLiteSaver, args=(detectorPipe[0], saverQueue))
-#TODO wire components together
+detector_delay = Process(target=DelayChangeDetector, args=(detectorPipe[0], saverQueue))
+saver_sqlite = Process(target=SQLiteSaver, args=(saver_filename, saverQueue))
+
+saver_sqlite.start()
+detector_delay.start()
+
+
 sys.path.append(ip2asn_dir)
 import ip2asn
 
