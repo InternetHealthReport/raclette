@@ -4,7 +4,7 @@ import datetime
 from collections import defaultdict
 import cPickle as pickle
 import ConfigParser
-from multiprocessing import Pool, Queue
+from multiprocessing import Pool, JoinableQueue
 
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
@@ -13,7 +13,8 @@ from firsthoptimetrack import FirstHopTimeTrack
 from astimetrack import ASTimeTrack
 # from iptimetrack import IPTimeTrack
 from tracksaggregator import TracksAggregator
-
+from delaychangedetector import DelayChangeDetector
+from sqlitesaver import SQLiteSaver
 
 
 def defaultdictlist(): 
@@ -52,6 +53,12 @@ tm_window_size = int(config.get("tracksaggregator", "window_size"))
 
 logging.warn("Started on {}".format(datetime.datetime.today()))
 # Initialisation
+saverQueue = JoinableQueue(10000)
+detectorPipe = Pipe(False)
+
+dcd = Process(target=DelayChangeDetector, args=(detectorPipe[0], saverQueue))
+sls = Process(target=SQLiteSaver, args=(detectorPipe[0], saverQueue))
+#TODO wire components together
 sys.path.append(ip2asn_dir)
 import ip2asn
 
@@ -79,6 +86,8 @@ with AtlasRestReader(atlas_start, atlas_stop, astt, atlas_msm_ids, atlas_probe_i
         
         tm.add_track(track) 
         tm.collect_results(results, dates)
+
+
 
         # if nb_total_traceroutes % tm_expiration == 0:
             # logging.warn("Total number of traceroute: {}\nTotal number of tracks: {} ({} expired, {} ignored, {} empty)".format(nb_total_traceroutes, tm.nb_tracks, tm.nb_expired_tracks, tm.nb_ignored_tracks, tm.nb_empty_tracks))
