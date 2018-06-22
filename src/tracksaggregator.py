@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import statsmodels.api as sm
 from collections import defaultdict 
 from itertools import combinations, product
 import tools
@@ -7,8 +8,9 @@ import tools
 
 class TracksAggregator():
 
-    def __init__(self, window_size, expiration):
+    def __init__(self, window_size, expiration, significance_level):
         self.window_size = window_size
+        self.significance_level = significance_level
         self.nb_ignored_tracks = 0
         self.nb_empty_tracks = 0
         self.nb_tracks = 0
@@ -17,6 +19,7 @@ class TracksAggregator():
         self.expiration = expiration
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
+        self.wilson_cache = dict()
 
     def add_track(self, track):
         """Add a new track to the history."""
@@ -49,12 +52,23 @@ class TracksAggregator():
                 diffrtt[(loc0,loc1)] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
 
         # Compute median/wilson scores and shift windows
-        # TODO wilson
         if len(diffrtt):
             for locations, dr in diffrtt.iteritems():
-                dra = np.array(dr, copy=False)
-                results[locations]["median"] = np.median(dra)
-                results[locations]["nb_samples"] = len(dra)
+                # dr = np.array(dr, copy=False)
+                dr.sort()
+                results[locations]["nb_samples"] = len(dr)
+
+                # Compute the wilson score
+                if len(dr) in self.wilson_cache:
+                    wilson_conf = self.wilson_cache[len(dr)]
+                else:
+                    wilson_conf = sm.stats.proportion_confint(len(dr)/2, len(dr), self.significance_level, "wilson")
+                    wilson_conf = np.array(wilson_conf)*len(dr)
+                    self.wilson_cache[len(dr)] = wilson_conf 
+
+                results[locations]["conf_low"] = dr[int(wilson_conf[0])]
+                results[locations]["conf_high"] = dr[int(wilson_conf[1])]
+                results[locations]["median"] = dr[int(len(dr)/2)]
 
         return results
 
