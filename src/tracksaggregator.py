@@ -19,18 +19,18 @@ class TracksAggregator():
         self.expiration = expiration
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
-        self.wilson_cache = dict()
+        self.wilson_cache = {}
 
     def add_track(self, track):
         """Add a new track to the history."""
 
         self.nb_tracks += 1
-        if track is None:
+        if not track:
             self.nb_empty_tracks += 1
             return
 
         bin_id = int(track["timestamp"]/self.window_size)
-        if self.bins_last_insert[bin_id] is None:
+        if not self.bins_last_insert[bin_id]:
             self.nb_ignored_tracks += 1
             return
 
@@ -43,7 +43,7 @@ class TracksAggregator():
 
 
     def compute_median_diff_rtt(self, tracks):
-        results = defaultdict(dict)
+        results = {}
         diffrtt = defaultdict(list)
         for track in tracks:
             for locPair in combinations(track["rtts"],2):
@@ -52,23 +52,20 @@ class TracksAggregator():
                 diffrtt[(loc0,loc1)] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
 
         # Compute median/wilson scores and shift windows
-        if len(diffrtt):
-            for locations, dr in diffrtt.iteritems():
-                # dr = np.array(dr, copy=False)
-                dr.sort()
-                results[locations]["nb_samples"] = len(dr)
+        wilson_conf = None
+        for locations, dr in diffrtt.iteritems():
+            dr.sort()
 
-                # Compute the wilson score
-                if len(dr) in self.wilson_cache:
-                    wilson_conf = self.wilson_cache[len(dr)]
-                else:
-                    wilson_conf = sm.stats.proportion_confint(len(dr)/2, len(dr), self.significance_level, "wilson")
-                    wilson_conf = np.array(wilson_conf)*len(dr)
-                    self.wilson_cache[len(dr)] = wilson_conf 
+            # Compute the wilson score
+            if len(dr) in self.wilson_cache:
+                wilson_conf = self.wilson_cache[len(dr)]
+            else:
+                wilson_conf = sm.stats.proportion_confint(len(dr)/2, len(dr), self.significance_level, "wilson")
+                wilson_conf = np.array(wilson_conf)*len(dr)
+                self.wilson_cache[len(dr)] = wilson_conf 
 
-                results[locations]["conf_low"] = dr[int(wilson_conf[0])]
-                results[locations]["conf_high"] = dr[int(wilson_conf[1])]
-                results[locations]["median"] = dr[int(len(dr)/2)]
+            results[locations] = {"nb_samples": len(dr), "conf_low": dr[int(wilson_conf[0])],
+                    "conf_high": dr[int(wilson_conf[1])], "median": dr[int(len(dr)/2)]}
 
         return results
 
