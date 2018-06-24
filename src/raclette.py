@@ -109,7 +109,7 @@ class Raclette():
             # # Main Loop:
             for track in tr_reader:
                 nb_total_traceroutes += 1
-                if track is None:
+                if not track:
                     continue
                 
                 if self.add_probe:

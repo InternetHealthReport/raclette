@@ -25,12 +25,12 @@ class TracksAggregator():
         """Add a new track to the history."""
 
         self.nb_tracks += 1
-        if not track:
+        if not track :
             self.nb_empty_tracks += 1
             return
 
         bin_id = int(track["timestamp"]/self.window_size)
-        if not self.bins_last_insert[bin_id]:
+        if self.bins_last_insert[bin_id] is None:
             self.nb_ignored_tracks += 1
             return
 
