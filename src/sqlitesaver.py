@@ -64,7 +64,7 @@ class SQLiteSaver(multiprocessing.Process):
             if self.expid != 1:
                 logging.warning("Database exists: results will be stored with experiment ID (expid) = %s" % self.expid)
 
-        if self.expid is None:
+        if not self.expid:
             logging.error("No experiment inserted for this data")
             return
 
