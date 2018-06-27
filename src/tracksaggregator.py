@@ -1,12 +1,10 @@
 import logging
-import multiprocessing
 import numpy as np
 import scipy
 import statsmodels.api as sm
 from collections import defaultdict 
 from itertools import combinations, product
 import tools
-import datetime
 
 def normalized_entropy(pk):
     """ Computes normalized entropy of the given distribution. Does not copy 
@@ -17,22 +15,6 @@ def normalized_entropy(pk):
     pk = pk / float(np.sum(pk, axis=0))
     vec = scipy.special.entr(pk)
     return np.sum(vec, axis=0)/np.log(len(pk))
-
-def default_metrics():
-    return {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int)}
-
-def compute_diff_rtt(tracks):
-    counters = defaultdict(default_metrics)
-    for track in tracks:
-        for locPair in combinations(track["rtts"],2):
-            (loc0, rtts0) = locPair[0]
-            (loc1, rtts1) = locPair[1]
-            count = counters[(loc0,loc1)]
-            count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
-            count["nb_tracks_per_asn"][track["from_asn"]] += 1
-            count["unique_probes"].add(track["prb_id"])
-
-    return counters
 
 class TracksAggregator():
     """
@@ -52,7 +34,6 @@ class TracksAggregator():
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
         self.wilson_cache = {}
-        self.pool = multiprocessing.Pool(12)
 
 
     def add_track(self, track):
@@ -76,7 +57,6 @@ class TracksAggregator():
         self.bins_last_insert[bin_id] = self.nb_tracks
 
 
-
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
         The returned dictionnary contains the differential median RTT, wilson 
@@ -84,36 +64,17 @@ class TracksAggregator():
         unique probes."""
 
         results = {}
-        # counters = defaultdict(lambda: {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int)})
-        counters = None
+        counters = defaultdict(lambda: {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int)})
 
-        print "tata"
-        print "len of tracks {}".format(len(tracks))
-        print datetime.datetime.now()
-        tracks_chunks = [tracks[x:x+100000] for x in xrange(0, len(tracks), 100000)] 
-        res = self.pool.imap_unordered(compute_diff_rtt,  tracks_chunks)
-        print datetime.datetime.now()
-        # Merge the results
-        for r in res:
-            print datetime.datetime.now()
-            if counters is None:
-                counters = r
-            else:
-                for locations, metrics in r.iteritems():
-                    counters[locations]["diffrtt"] += metrics["diffrtt"]
-                    for asn, nb_tracks in metrics["nb_tracks_per_asn"].iteritems():
-                        counters[locations]["nb_tracks_per_asn"][asn] += nb_tracks
-                    counters[locations]["unique_probes"].update(metrics["unique_probes"])
+        for track in tracks:
+            for locPair in combinations(track["rtts"],2):
+                (loc0, rtts0) = locPair[0]
+                (loc1, rtts1) = locPair[1]
+                count = counters[(loc0,loc1)]
+                count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
+                count["nb_tracks_per_asn"][track["from_asn"]] += 1
+                count["unique_probes"].add(track["prb_id"])
 
-            # for locPair in combinations(track["rtts"],2):
-                # (loc0, rtts0) = locPair[0]
-                # (loc1, rtts1) = locPair[1]
-                # count = counters[(loc0,loc1)]
-                # count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
-                # count["nb_tracks_per_asn"][track["from_asn"]] += 1
-                # count["unique_probes"].add(track["prb_id"])
-
-        print datetime.datetime.now()
         # Compute median/wilson scores 
         wilson_conf = None
         for locations, count in counters.iteritems():
@@ -137,8 +98,6 @@ class TracksAggregator():
                     "entropy": entropy
                     }
 
-        print datetime.datetime.now()
-        print "toto"
         return results
 
 
