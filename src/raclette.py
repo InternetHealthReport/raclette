@@ -21,9 +21,17 @@ from sqlitesaver import SQLiteSaver
 
 
 class Raclette():
-
+    """
+    Main program that connects all modules. Fetch traceroute data, compute time
+    tracks, differential RTTs and anomaly detection.
+    Parameters are provided in the default config file (conf/raclette.conf) or 
+    the one given as argument.
+    """
 
     def read_config(self):
+        """
+        Reads the configuration file and initialize accordingly.
+        """
 
         parser = argparse.ArgumentParser()
         parser.add_argument("-C","--config_file", help="Get all parameters from the specified config file", type=str, default="conf/raclette.conf")
@@ -70,18 +78,24 @@ class Raclette():
         self.config = config
 
     def save_aggregates(self, saver_queue, aggregates):
+        """
+        Save differential RTTs values on disk.
+        """
 
         for date, results in aggregates.iteritems():
             saver_queue.put("BEGIN TRANSACTION;")
             for locations, agg in results.iteritems():
-                entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"]))
+                entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"], agg["nb_samples"], agg["nb_probes"], agg["entropy"]))
                 saver_queue.put(entry)
             saver_queue.put("COMMIT;")
 
     def main(self):
+        """
+        Main program connecting all modules.
+        """
 
         # Initialisation
-        saver_queue = JoinableQueue(1000000)
+        saver_queue = JoinableQueue(100000)
         detector_pipe = Pipe(False)
 
         # These are run in a separate process

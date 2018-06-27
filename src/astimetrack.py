@@ -19,8 +19,9 @@ class ASTimeTrack():
         if trace is None or "error" in trace["result"][0] or "err" in trace["result"][0]["result"]:
             return None
 
-        timetrack = {"prb_id": trace["prb_id"], "msm_id": trace["msm_id"], 
-                "timestamp":trace["timestamp"], "rtts":[]}
+        probe_asn = self.i2a.ip2asn(trace["from"]) if (trace.get("from", "")) else "Unk"
+        timetrack = {"prb_id": trace["prb_id"], "from_asn": probe_asn, 
+                "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
 	for hopNb, hop in enumerate(trace["result"]):
 
