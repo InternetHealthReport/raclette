@@ -29,7 +29,7 @@ class AtlasRestReader():
         global TT_CONVERTER
         TT_CONVERTER = timetrack_converter 
 
-        self.pool = Pool(processes=12) 
+        self.pool = Pool(processes=6) 
         self.msm_ids = msm_ids
         self.probe_ids = probe_ids
         self.start = start
