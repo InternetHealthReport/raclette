@@ -128,8 +128,8 @@ class Raclette():
 
         saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
-        with AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, self.atlas_msm_ids, self.atlas_probe_ids, 
-                chunk_size=self.atlas_chunk_size) as tr_reader:
+        with AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
+                self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) as tr_reader:
         # with DumpReader(dump_name, dump_filter) as tr_reader:
 
             # # Main Loop:

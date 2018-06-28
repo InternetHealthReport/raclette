@@ -2,4 +2,4 @@ scipy
 statsmodels
 numpy
 matplotlib
-ripe.atlas.cousteau 
+ripe.atlas.cousteau
