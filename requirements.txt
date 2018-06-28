@@ -3,3 +3,5 @@ statsmodels
 numpy
 matplotlib
 ripe.atlas.cousteau 
+apsw
+sqlite3
