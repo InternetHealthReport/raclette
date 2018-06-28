@@ -1,12 +1,13 @@
 import os
+import logging
 from matplotlib import pylab as plt
 import itertools
 import sqlite3
 import numpy as np
 from collections import defaultdict
 from datetime import datetime
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
 import matplotlib.dates as mdates
+import pandas as pd
 
 def ecdf(a, ax=None, **kwargs):
     sorted=np.sort( a )
@@ -38,34 +39,33 @@ class Plotter(object):
             db = [db]
 
         self.dbfiles = db
-        self.cursor = []
+        self.conn = []
         for d in db:
             if os.path.getsize(d) > 100000:
                 conn = sqlite3.Connection(d) 
-                self.cursor.append(conn.cursor())
+                self.conn.append(conn)
 
 
-    def diffrtt_distribution(self, startpoint, endpoint, filename="{}_diffrtt_distribution.pdf"):
+    def diffrtt_distribution(self, startpoint, endpoint, filename="{}_diffrtt_distribution.pdf", expid=1):
         """Plot the distribution of differential RTT values for the given start
         and end points. """
         
+        all_df = []
+        for conn in self.conn:
+            all_df.append(pd.read_sql_query("SELECT ts, median, confhigh, conflow, nbsamples, nbprobes  FROM diffrtt where expid=? and startpoint=? and endpoint=?", conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+            
+        diffrtt = pd.concat(all_df)
+
+        # Plot the distribution of the median differential RTT
         fig = plt.figure()
 
-        diffrtt = defaultdict(list)
-        for cursor_id, cursor in enumerate(self.cursor):
-            data=cursor.execute("SELECT median, confhigh, conflow  FROM diffrtt where expid=%s and startpoint=%s and endpoint=%s order by ts" % (expid, startpoint, endpoint))
-            
-            for ts, dr_med, dr_high, dr_low in data:
-                diffrtt["median"].append(dr_med)
-                diffrtt["high"].append(dr_high)
-                diffrtt["low"].append(dr_low)
-
         yval = ecdf(diffrtt["median"], label="median")
-        yval = ecdf(diffrtt["high"], label="high")
-        yval = ecdf(diffrtt["low"], label="low")
+        yval = ecdf(diffrtt["confhigh"], label="high")
+        yval = ecdf(diffrtt["conflow"], label="low")
 
         plt.xlabel("Differential RTT (ms)")
         plt.ylabel("CDF")
+        plt.legend(loc='best', fontsize=8 )
         # plt.xscale("log")
         plt.ylim([0, 1.1])
 
@@ -73,35 +73,79 @@ class Plotter(object):
         fig.savefig(filename)
 
 
+    def diffrtt_time(self, location, filename="{}_diffrtt_time_{}.pdf", expid=1, tz="UTC"):
 
-    def diffrtt_time(self, location, filename="{}_diffrtt_time.pdf", expid=1):
+        filename = filename.format(location, "raw")
+        all_df = []
 
-        filename = filename.format(location)
-        diffrtt = defaultdict(lambda: defaultdict(list))
-        marker = itertools.cycle(('^', '.', 'x', '+', 'v','*'))
-        color = itertools.cycle(('C1', 'C0', 'C2', 'C4', 'C3'))
-        fig = plt.figure()
-        ax = plt.subplot()
-        for cursor_id, cursor in enumerate(self.cursor):
-            data=cursor.execute("SELECT ts, startpoint, endpoint, median, confhigh, conflow  FROM diffrtt where expid=%s and (startpoint=%s or endpoint=%s) order by ts" % (expid, location, location))
+        for conn in self.conn:
+            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and (startpoint=? or endpoint=?) order by ts" , conn, "ts", params=(expid, location, location), parse_dates=["ts"]) )
             
-            for ts, loc0, loc1, dr_med, dr_high, dr_low in data:
-                xval = datetime.utcfromtimestamp(ts)
-                diffrtt[(loc0,loc1)]["ts"].append(xval)
-                diffrtt[(loc0,loc1)]["median"].append(dr_med)
-                diffrtt[(loc0,loc1)]["high"].append(dr_high)
-                diffrtt[(loc0,loc1)]["low"].append(dr_low)
+        diffrtt = pd.concat(all_df)
+        diffrtt.index = diffrtt.index.tz_localize("UTC")
+        diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
-        for locations, data in hege.iteritems():
-            plt.plot(data["ts"], data["median"], label=str(asn))
-            # plt.plot(data["ts"], data["median"], marker=marker.next(), label=str(asn))
+        nbsamples_avg = diffrtt["nbsamples"].mean()
 
+        fig = plt.figure()
+        for locations, data in diffrtt_grp:
+            # Ignore locations with a small number of samples
+            if data["nbsamples"].mean()>nbsamples_avg:
+                plt.plot(data["median"], label=str(locations))
+
+        plt.gca().xaxis_date(tz)
         plt.ylabel("Differential RTT (ms)")
+        plt.xlabel("Time ({})".format(tz))
         plt.title(location)
-        plt.legend(loc='upper center', ncol=4, bbox_to_anchor=(0.5, 1.2), fontsize=8 )
+        plt.legend(loc='best', ncol=4, fontsize=8 )
         fig.autofmt_xdate() 
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.savefig(filename)
 
+
+    def profile_endpoint(self, endpoint, filename="{}_profile_{}.pdf", expid=1, tz="UTC", ylim=[2,12]):
+
+
+        all_df = []
+        for conn in self.conn:
+            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and endpoint=? order by ts" , conn, "ts", params=(expid, endpoint), parse_dates=["ts"]) )
+            
+        diffrtt = pd.concat(all_df)
+        diffrtt.index = diffrtt.index.tz_localize("UTC")
+        if tz != "UTC":
+            diffrtt.index = diffrtt.index.tz_convert(tz)
+
+        nbsamples_avg = diffrtt["nbsamples"].mean()
+        logging.warn("{} average samples".format(nbsamples_avg))
+
+        # Split weekday and weekend
+        weekday = diffrtt[diffrtt.index.weekday<5]
+        weekend = diffrtt[diffrtt.index.weekday>4]
+        weekday_avg = weekday.groupby(weekday.index.hour).median()
+        weekend_avg = weekend.groupby(weekend.index.hour).median()
+
+        fig = plt.figure(figsize=(6,4))
+        plt.plot(weekday_avg["median"])
+        plt.plot(weekday_avg["confhigh"])
+        plt.plot(weekday_avg["conflow"])
+        plt.ylabel("Differential RTT (ms)")
+        plt.xlabel("Time ({})".format(tz))
+        plt.title("Weekday: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
+        plt.ylim(ylim)
+        # plt.tight_layout()
+        filename = filename.format(endpoint, "weekday")
+        plt.savefig(filename)
+
+        fig = plt.figure(figsize=(6,4))
+        plt.plot(weekend_avg["median"])
+        plt.plot(weekend_avg["confhigh"])
+        plt.plot(weekend_avg["conflow"])
+        plt.ylabel("Average Differential RTT (ms)")
+        plt.xlabel("Time ({})".format(tz))
+        plt.title("Weekend: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
+        plt.ylim(ylim)
+        # plt.tight_layout()
+        filename = filename.format(endpoint, "weekend")
+        plt.savefig(filename)
 
 
