@@ -50,10 +50,11 @@ class Raclette():
         self.dump_name =  config.get("io", "dump_file")
         self.dump_filter =  config.get("io", "filter")
 
-        self.add_probe = config.get("timetrack", "add_probe")
+        self.add_probe = config.getboolean("timetrack", "add_probe")
 
         self.ip2asn_dir = config.get("lib", "ip2asn_directory")
         self.ip2asn_db = config.get("lib", "ip2asn_db")
+        self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
 
         self.tm_expiration = int(config.get("tracksaggregator", "expiration"))
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
@@ -110,7 +111,7 @@ class Raclette():
         sys.path.append(self.ip2asn_dir)
         import ip2asn
 
-        i2a = ip2asn.ip2asn(self.ip2asn_db)
+        i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
         fhtt = FirstHopTimeTrack(i2a)
         astt = ASTimeTrack(i2a)
         tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level)

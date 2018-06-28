@@ -58,6 +58,7 @@ class AtlasRestReader():
             self.pool.terminate()
         return False
 
+
 if __name__ == "__main__":
     with AtlasRestReader(datetime.datetime(2018,6,1,0,0), datetime.datetime(2018,6,2,0,0)) as arr:
             for tr in arr:
