@@ -7,7 +7,7 @@ from ripe.atlas.cousteau import AtlasResultsRequest
 
 TT_CONVERTER = None
 
-def get_results(kwargs):
+def get_results(kwargs, retry=3):
 
     global TT_CONVERTER
 
@@ -17,8 +17,12 @@ def get_results(kwargs):
     if is_success:
         return map(TT_CONVERTER.traceroute2timetrack,results)
     else:
-        logging.error("Atlas request failed for {}".format(kwargs))
-        return None
+        logging.warning("Atlas request failed for {}".format(kwargs))
+        if retry > 0:
+            return get_results(kwargs, retry-1)
+        else:
+            logging.error("All retries failed for {}".format(kwargs))
+            return None
 
 
 class AtlasRestReader():
