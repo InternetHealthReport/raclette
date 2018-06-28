@@ -72,7 +72,7 @@ class SQLiteSaver(multiprocessing.Process):
 
             if self.prevts != ts:
                 self.prevts = ts
-                logging.info("start recording differential RTTs")
+                logging.info("start recording diff. RTTs (ts={})".format(ts))
             
             self.cursor.execute("INSERT INTO diffrtt(ts, startpoint, endpoint, median, confhigh, conflow, nbsamples, nbprobes, entropy, expid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (ts, startpoint, endpoint, median, high, low, nb_samples, nb_probes, entropy, self.expid) )
                     # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )

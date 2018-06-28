@@ -14,7 +14,9 @@ def normalized_entropy(pk):
     pk = np.array(pk, copy=False)
     pk = pk / float(np.sum(pk, axis=0))
     vec = scipy.special.entr(pk)
+
     return np.sum(vec, axis=0)/np.log(len(pk))
+
 
 class TracksAggregator():
     """

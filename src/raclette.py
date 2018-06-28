@@ -77,6 +77,7 @@ class Raclette():
 
         self.config = config
 
+
     def save_aggregates(self, saver_queue, aggregates):
         """
         Save differential RTTs values on disk.
@@ -88,6 +89,7 @@ class Raclette():
                 entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"], agg["nb_samples"], agg["nb_probes"], agg["entropy"]))
                 saver_queue.put(entry)
             saver_queue.put("COMMIT;")
+
 
     def main(self):
         """
