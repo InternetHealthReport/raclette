@@ -12,8 +12,6 @@ import tools
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
 
-from firsthoptimetrack import FirstHopTimeTrack
-from astimetrack import ASTimeTrack
 # from iptimetrack import IPTimeTrack
 from tracksaggregator import TracksAggregator
 from delaychangedetector import DelayChangeDetector
@@ -50,6 +48,7 @@ class Raclette():
         self.dump_name =  config.get("io", "dump_file")
         self.dump_filter =  config.get("io", "filter")
 
+        self.timetrack_converter = config.get("timetrack", "converter")
         self.add_probe = config.getboolean("timetrack", "add_probe")
 
         self.ip2asn_dir = config.get("lib", "ip2asn_directory")
@@ -112,14 +111,20 @@ class Raclette():
         import ip2asn
 
         i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
-        fhtt = FirstHopTimeTrack(i2a)
-        astt = ASTimeTrack(i2a)
+        if self.timetrack_converter == "firsthoptimetrack":
+            from firsthoptimetrack import FirstHopTimeTrack
+            timetrackconverter = FirstHopTimeTrack(i2a)
+        elif self.timetrack_converter == "astimetrack":
+            from astimetrack import ASTimeTrack
+            timetrackconverter = ASTimeTrack(i2a)
+        else:
+            logging.error("Time track converter ({}) unknown".format(self.timetrack_converter))
         tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level)
         nb_total_traceroutes = 0
 
         saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
-        with AtlasRestReader(self.atlas_start, self.atlas_stop, astt, self.atlas_msm_ids, self.atlas_probe_ids, 
+        with AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, self.atlas_msm_ids, self.atlas_probe_ids, 
                 chunk_size=self.atlas_chunk_size) as tr_reader:
         # with DumpReader(dump_name, dump_filter) as tr_reader:
 
