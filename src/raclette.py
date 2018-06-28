@@ -109,16 +109,20 @@ class Raclette():
 
         sys.path.append(self.ip2asn_dir)
         import ip2asn
-
         i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
+
         if self.timetrack_converter == "firsthoptimetrack":
             from firsthoptimetrack import FirstHopTimeTrack
             timetrackconverter = FirstHopTimeTrack(i2a)
+
         elif self.timetrack_converter == "astimetrack":
             from astimetrack import ASTimeTrack
             timetrackconverter = ASTimeTrack(i2a)
+
         else:
             logging.error("Time track converter ({}) unknown".format(self.timetrack_converter))
+            return
+
         tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level)
         nb_total_traceroutes = 0
 
