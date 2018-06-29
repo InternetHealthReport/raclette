@@ -8,6 +8,9 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.dates as mdates
 import pandas as pd
+from ripe.atlas.cousteau import Probe
+import reverse_geocoder as rg
+
 
 def ecdf(a, ax=None, **kwargs):
     sorted=np.sort( a )
@@ -29,7 +32,6 @@ def eccdf(a, ax=None, **kwargs):
     return {k:v for k,v in zip(sorted, 1-yvals)}
 
 
-
 class Plotter(object):
 
     """Read results from the sqlite database and plot interesting stuff. """
@@ -44,6 +46,31 @@ class Plotter(object):
             if os.path.getsize(d) > 100000:
                 conn = sqlite3.Connection(d) 
                 self.conn.append(conn)
+
+        self.probe_info = {}
+
+    def get_probe_info(self, probe_id):
+        """Query RIPE Atlas API to get probe information. The result is stored
+        in self.probe_info."""
+
+        if probe_id not in self.probe_info:
+            # filters = {"id": probe_id}
+            # probes = ProbeRequest(**filters)
+            probe = Probe(id=probe_id)
+            self.probe_info[probe_id] = probe
+        
+
+
+    def probe_geo_loc(self, probe_id, resolution):
+        """Retrieve probe informations and find the geo-location of the probe
+        corresponding to probe_id. The resolution parameter can take the following
+        values: cc, name, admin1, admin2"""
+
+        self.get_probe_info(probe_id)
+        lon, lat = self.probe_info[probe_id].geometry["coordinates"]
+        geoloc = rg.search((lat, lon))
+
+        return geoloc[0][resolution]
 
 
     def diffrtt_distribution(self, startpoint, endpoint, filename="{}_diffrtt_distribution.pdf", expid=1):
@@ -73,34 +100,67 @@ class Plotter(object):
         fig.savefig(filename)
 
 
-    def diffrtt_time(self, location, filename="{}_diffrtt_time_{}.pdf", expid=1, tz="UTC"):
+    def diffrtt_time(self, startpoint, endpoint, filename="{}_{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, probe_geoloc=None, group = True):
 
-        filename = filename.format(location, "raw")
         all_df = []
 
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and (startpoint=? or endpoint=?) order by ts" , conn, "ts", params=(expid, location, location), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and startpoint like ? and endpoint like ? order by ts" , conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
             
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
+
+        # Geolocate probes if needed
+        if probe_geoloc is not None:
+            geo_loc = {}
+            nb_probes_per_geo = defaultdict(int)
+            for loc in diffrtt["startpoint"].unique():
+                if loc.startswith("pid"):
+                    geo = self.probe_geo_loc(int(loc.rpartition("_")[2]), probe_geoloc)
+                    geo_loc[loc] = geo
+                    nb_probes_per_geo[geo] += 1
+
+            diffrtt["startpoint"] = diffrtt["startpoint"].replace(geo_loc.keys(), geo_loc.values())
+
         diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
         nbsamples_avg = diffrtt["nbsamples"].mean()
+        logging.warn("{} average samples".format(nbsamples_avg))
 
-        fig = plt.figure()
+        if group:
+            fig = plt.figure(figsize=(8,4))
+
         for locations, data in diffrtt_grp:
+            if data["nbsamples"].mean()<nbsamples_avg:
+                continue
+            if not group :
+                fig = plt.figure(figsize=(8,4))
             # Ignore locations with a small number of samples
-            if data["nbsamples"].mean()>nbsamples_avg:
-                plt.plot(data["median"], label=str(locations))
+            if group:
+                    plt.plot(data["median"], label=str(locations))
+            else:
+                plt.plot(data["median"])
+                plt.title("{} to {} ({} probes)".format(locations[0], locations[1], nb_probes_per_geo[locations[0]]))
+                # plt.plot(data["confhigh"], label="high")
+                # plt.plot(data["conflow"], label="low")
+        
+            endpoint_label = "all" if endpoint == "%" else endpoint
+            startpoint_label = "all" if startpoint == "%" else startpoint
+            plt.gca().xaxis_date(tz)
+            plt.ylabel("Differential RTT (ms)")
+            plt.xlabel("Time ({})".format(tz))
+            plt.ylim(ylim)
+            fig.autofmt_xdate() 
+            # plt.tight_layout()
+            if not group:
+                fname = filename.format(locations[0], locations[1])
+                plt.savefig(fname)
 
-        plt.gca().xaxis_date(tz)
-        plt.ylabel("Differential RTT (ms)")
-        plt.xlabel("Time ({})".format(tz))
-        plt.title(location)
-        plt.legend(loc='best', ncol=4, fontsize=8 )
-        fig.autofmt_xdate() 
-        # plt.tight_layout()
-        plt.savefig(filename)
+        if group:
+            plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            plt.legend(loc='best', ncol=4, fontsize=8 )
+            fname = filename.format(startpoint_label, endpoint_label)
+            plt.savefig(fname)
 
 
     def profile_endpoint(self, endpoint, filename="{}_profile_{}.pdf", expid=1, tz="UTC", ylim=[2,12]):
@@ -133,8 +193,8 @@ class Plotter(object):
         plt.title("Weekday: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
         plt.ylim(ylim)
         # plt.tight_layout()
-        filename = filename.format(endpoint, "weekday")
-        plt.savefig(filename)
+        fname = filename.format(endpoint, "weekday")
+        plt.savefig(fname)
 
         fig = plt.figure(figsize=(6,4))
         plt.plot(weekend_avg["median"])
@@ -145,7 +205,7 @@ class Plotter(object):
         plt.title("Weekend: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
         plt.ylim(ylim)
         # plt.tight_layout()
-        filename = filename.format(endpoint, "weekend")
-        plt.savefig(filename)
+        fname = filename.format(endpoint, "weekend")
+        plt.savefig(fname)
 
 

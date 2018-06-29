@@ -5,3 +5,4 @@ matplotlib
 ripe.atlas.cousteau
 apsw
 sqlite3
+reverse-geocoder
