@@ -39,8 +39,6 @@ class FirstHopTimeTrack():
 
                     timetrack["rtts"][-1][1].append(res["rtt"])
 
-                    if str(trace["prb_id"])=="11902" and str(router_asn) == "17676":
-                        print trace
 
                 if found_first_hop:
                     return timetrack
