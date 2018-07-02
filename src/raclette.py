@@ -123,17 +123,16 @@ class Raclette():
             return
 
         tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level)
-        nb_total_traceroutes = 0
 
         saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
-        with AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
-                self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) as tr_reader:
-        # with DumpReader(dump_name, dump_filter) as tr_reader:
+        tr_reader = AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
+                self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) 
+        # tr_reader  = DumpReader(dump_name, dump_filter)
 
-            # # Main Loop:
-            for track in tr_reader:
-                nb_total_traceroutes += 1
+        # # Main Loop:
+        with tr_reader:
+            for track in tr_reader.read():
                 if not track:
                     continue
                 
@@ -143,7 +142,6 @@ class Raclette():
                 tm.add_track(track) 
                 aggregates = tm.aggregate()
                 self.save_aggregates(saver_queue, aggregates)
-
 
         logging.info("Finished to read data {}".format(datetime.datetime.today()))
 

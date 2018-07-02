@@ -2,14 +2,16 @@ import json
 import datetime
 import logging
 import itertools 
-from multiprocessing import Pool
+import multiprocessing 
 from ripe.atlas.cousteau import AtlasResultsRequest
 
 TT_CONVERTER = None
 
-def get_results(kwargs, retry=3):
+def get_results((semaphore,kwargs), retry=3):
 
     global TT_CONVERTER
+    if retry==3:
+        semaphore.acquire()
 
     logging.debug("Requesting results for {}".format(kwargs))
     is_success, results = AtlasResultsRequest(**kwargs).create()
@@ -33,16 +35,22 @@ class AtlasRestReader():
         global TT_CONVERTER
         TT_CONVERTER = timetrack_converter 
 
-        self.pool = Pool(processes=6) 
+        self.pool = None
+        # Semaphore is used to control the number of buffered results from the
+        # pool
+        self.semaphore = None
         self.msm_ids = msm_ids
         self.probe_ids = probe_ids
         self.start = start
         self.end = end
         self.chunk_size = chunk_size
+        self.params = []
 
-    def __enter__(self):
-        
-        params = []
+    def __enter__(self):    
+        self.params = []
+        self.pool = multiprocessing.Pool(processes=8) 
+        self.semaphore = multiprocessing.Manager().Semaphore(100) 
+
         window_start = self.start
         while window_start+datetime.timedelta(seconds=self.chunk_size) <= self.end:
             for msm_id in self.msm_ids:
@@ -52,12 +60,25 @@ class AtlasRestReader():
                     "stop": window_start+datetime.timedelta(seconds=self.chunk_size),
                     "probe_ids": self.probe_ids,
                         }
-                params.append(kwargs)
+                self.params.append([self.semaphore,kwargs])
             window_start += datetime.timedelta(seconds=self.chunk_size)
-            
-        return itertools.chain.from_iterable(self.pool.imap(get_results, params))
 
-    def __exit__(self, type, value, traceback): 
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
+    def read(self):
+        # return itertools.chain.from_iterable(self.pool.imap(get_results, params))
+        for tracks in self.pool.imap(get_results, self.params):
+            for track in tracks:
+                yield track
+            
+            self.semaphore.release()
+
+
+    def close(self): 
         if self.pool is not None: 
             self.pool.terminate()
         return False
