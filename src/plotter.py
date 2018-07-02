@@ -138,14 +138,14 @@ class Plotter(object):
             fig = plt.figure(figsize=(8,4))
 
         for locations, data in diffrtt_grp:
-            if data["nbsamples"].mean()<nbsamples_avg:
+            if data["nbsamples"].mean()<nbsamples_avg/2.0:
                 continue
             if not group :
                 fig = plt.figure(figsize=(8,4))
             # Ignore locations with a small number of samples
             if group:
-                label = str(locations) if label is None else label
-                plt.plot(data[metric], label=label)
+                x_label = str(locations) if label is None else label
+                plt.plot(data[metric], label=x_label)
             else:
                 plt.plot(data[metric], label=label)
                 plt.title("{} to {} ({} probes)".format(locations[0], locations[1], nb_probes_per_geo[locations[0]]))
@@ -155,6 +155,8 @@ class Plotter(object):
             plt.xlabel("Time ({})".format(tz))
             plt.ylim(ylim)
             fig.autofmt_xdate() 
+            if label is not None or group:
+                plt.legend(loc='best', ncol=4, fontsize=8 )
             # plt.tight_layout()
             if not group:
                 fname = filename.format(locations[0], locations[1], metric, expid)
@@ -162,12 +164,11 @@ class Plotter(object):
 
         if group:
             plt.title("{} to {}".format(startpoint_label, endpoint_label))
-            plt.legend(loc='best', ncol=4, fontsize=8 )
             fname = filename.format(startpoint_label, endpoint_label, metric, expid)
             plt.savefig(fname)
 
 
-    def profile_endpoint(self, endpoint, filename="fig/{}_profile_{}_expid{}.pdf", expid=1, tz="UTC", ylim=[2,12]):
+    def profile_endpoint(self, endpoint, filename="fig/{}_profile_{}_expid{}.pdf", expid=1, tz="UTC", ylim=None):
 
 
         all_df = []
