@@ -20,7 +20,7 @@ class ASTimeTrack():
             return None
 
         probe_asn = self.i2a.ip2asn(trace["from"]) if (trace.get("from", "")) else "Unk"
-        timetrack = {"prb_id": trace["prb_id"], "from_asn": probe_asn, 
+        timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
                 "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
 	for hopNb, hop in enumerate(trace["result"]):
@@ -35,8 +35,13 @@ class ASTimeTrack():
                     if res["from"] != router_ip:
                         router_ip = res["from"]    
                         router_asn = self.i2a.ip2asn(router_ip)
-                        if router_asn == "unknown":
-                            router_asn = router_ip
+                        if router_asn<0:
+                            router_asn = "IX"+str(router_asn)
+                        else:
+                            router_asn = "AS"+str(router_asn)
+                    
+                        # if router_asn == "unknown":
+                            # router_asn = router_ip
                     
                     idx = -1
                     if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != router_asn:

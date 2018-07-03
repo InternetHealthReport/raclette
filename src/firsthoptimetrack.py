@@ -17,7 +17,7 @@ class FirstHopTimeTrack():
             return None
 
         probe_asn = 0 # Not needed here, in theory first link stays in the same ASN
-        timetrack = {"prb_id": trace["prb_id"], "from_asn": probe_asn, 
+        timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
                 "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
 	for hopNb, hop in enumerate(trace["result"]):

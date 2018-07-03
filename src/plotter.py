@@ -122,8 +122,8 @@ class Plotter(object):
             geo_loc = {}
             nb_probes_per_geo = defaultdict(int)
             for loc in diffrtt["startpoint"].unique():
-                if loc.startswith("pid"):
-                    geo = self.probe_geo_loc(int(loc.rpartition("_")[2]), probe_geoloc)
+                if loc.startswith("PB"):
+                    geo = self.probe_geo_loc(int(loc[2:]), probe_geoloc)
                     geo_loc[loc] = geo
                     nb_probes_per_geo[geo] += 1
 

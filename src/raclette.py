@@ -137,7 +137,7 @@ class Raclette():
                     continue
                 
                 if self.add_probe:
-                    track["rtts"] = [("pid_{}".format(track["prb_id"]), [0])] + track["rtts"]
+                    track["rtts"] = [(track["prb_id"], [0])] + track["rtts"]
                 
                 tm.add_track(track) 
                 aggregates = tm.aggregate()
