@@ -36,7 +36,7 @@ class ASTimeTrack():
                         router_ip = res["from"]    
                         router_asn = self.i2a.ip2asn(router_ip)
                         if router_asn<0:
-                            router_asn = "IX"+str(router_asn)
+                            router_asn = "IX"+str(router_asn*-1)
                         else:
                             router_asn = "AS"+str(router_asn)
                     

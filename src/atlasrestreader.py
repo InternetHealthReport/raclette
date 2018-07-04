@@ -21,7 +21,7 @@ def get_results((semaphore,kwargs), retry=3):
     else:
         logging.warning("Atlas request failed for {}".format(kwargs))
         if retry > 0:
-            return get_results(kwargs, retry-1)
+            return get_results((semaphore,kwargs), retry-1)
         else:
             logging.error("All retries failed for {}".format(kwargs))
             return None

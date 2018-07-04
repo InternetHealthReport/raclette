@@ -80,6 +80,9 @@ class TracksAggregator():
         # Compute median/wilson scores 
         wilson_conf = None
         for locations, count in counters.iteritems():
+            if len(count["diffrtt"])<27:
+                continue
+
             count["diffrtt"].sort()
             entropy =  normalized_entropy(count["nb_tracks_per_asn"].values()) if len(count["nb_tracks_per_asn"])>1 else 0.0
 
@@ -123,7 +126,7 @@ class TracksAggregator():
                     else:
                         logging.debug("Force expiration for bin {}".format(date))
 
-                    logging.warn("Processing bin {}".format(date))
+                    logging.info("Processing bin {}".format(date))
                     expired_bins.append(date)
 
                     results[date*self.window_size+self.window_size/2] = self.compute_median_diff_rtt(tracks)

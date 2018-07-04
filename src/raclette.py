@@ -149,6 +149,8 @@ class Raclette():
         aggregates = tm.aggregate(force_expiration=0.5)
         self.save_aggregates(saver_queue, aggregates)
 
+        logging.info("Number of ignored tracks {}".format(tm.nb_ignored_tracks))
+
         # closing
         saver_queue.join()
         saver_sqlite.terminate()
