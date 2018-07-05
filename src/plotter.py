@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from matplotlib import pylab as plt
 import itertools
@@ -9,7 +10,10 @@ from datetime import datetime
 import matplotlib.dates as mdates
 import pandas as pd
 from ripe.atlas.cousteau import Probe
-import reverse_geocoder as rg
+try:
+    import reverse_geocoder as rg
+except ImportError:
+    logging.warn("Could not import reverse_geocoder")
 
 
 def ecdf(a, ax=None, **kwargs):
@@ -84,7 +88,7 @@ class Plotter(object):
         
         all_df = []
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, median, confhigh, conflow, nbsamples, nbprobes  FROM diffrtt where expid=? and startpoint=? and endpoint=?", conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query("SELECT ts, median, confhigh, conflow, nbtracks, nbprobes  FROM diffrtt where expid=? and startpoint=? and endpoint=?", conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
             
         diffrtt = pd.concat(all_df)
 
@@ -112,7 +116,7 @@ class Plotter(object):
         startpoint_label = startpoint if startpoint_label is None else startpoint_label
 
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and startpoint like ? and endpoint like ? order by ts" , conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks FROM diffrtt where expid=? and startpoint like ? and endpoint like ? order by ts" , conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
             
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
@@ -131,14 +135,14 @@ class Plotter(object):
 
         diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
-        nbsamples_avg = diffrtt["nbsamples"].mean()
-        logging.warn("{} average samples".format(nbsamples_avg))
+        nbtracks_avg = diffrtt["nbtracks"].mean()
+        logging.warn("{} average samples".format(nbtracks_avg))
 
         if group:
             fig = plt.figure(figsize=(8,4))
 
         for locations, data in diffrtt_grp:
-            if data["nbsamples"].mean()<nbsamples_avg/2.0:
+            if data["nbtracks"].mean()<nbtracks_avg/2.0:
                 continue
             if not group :
                 fig = plt.figure(figsize=(8,4))
@@ -173,15 +177,15 @@ class Plotter(object):
 
         all_df = []
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and endpoint=? order by ts" , conn, "ts", params=(expid, endpoint), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks FROM diffrtt where expid=? and endpoint=? order by ts" , conn, "ts", params=(expid, endpoint), parse_dates=["ts"]) )
             
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
         if tz != "UTC":
             diffrtt.index = diffrtt.index.tz_convert(tz)
 
-        nbsamples_avg = diffrtt["nbsamples"].mean()
-        logging.warn("{} average samples".format(nbsamples_avg))
+        nbtracks_avg= diffrtt["nbtracks"].mean()
+        logging.warn("{} average samples".format(nbtracks_avg))
 
         # Split weekday and weekend
         weekday = diffrtt[diffrtt.index.weekday<5]
@@ -212,5 +216,22 @@ class Plotter(object):
         # plt.tight_layout()
         fname = filename.format(endpoint, "weekend", expid)
         plt.savefig(fname)
+
+
+if __name__ == "__main__":
+   
+    if len(sys.argv)<4:
+        print("usage: {} db startpoint enpoint")
+        sys.exit()
+
+    db = sys.argv[1]
+    startpoint=sys.argv[2]
+    endpoint=sys.argv[3]
+
+    pl = Plotter(db) 
+
+    pl.metric_over_time(startpoint, endpoint)
+    # pl.profile_endpoint(startpoint)
+    # pl.profile_endpoint(endpoint)
 
 
