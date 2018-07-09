@@ -36,7 +36,7 @@ class Plotter(object):
 
     """Read results from the sqlite database and plot interesting stuff. """
 
-    def __init__(self, db="results/ashash_results.sql"):
+    def __init__(self, db="results/ashash_results.sql", fig_directory="fig/"):
         if not isinstance(db,list):
             db = [db]
 
@@ -49,8 +49,10 @@ class Plotter(object):
 
         self.probe_info = {}
 
-        if not os.path.exists("fig/"):
-            os.mkdir("fig")
+        if not os.path.exists(fig_directory):
+            os.mkdir(fig_directory)
+
+        self.fig_directory = fig_directory
 
     def get_probe_info(self, probe_id):
         """Query RIPE Atlas API to get probe information. The result is stored
@@ -78,7 +80,7 @@ class Plotter(object):
         return geoloc[0][resolution]
 
 
-    def diffrtt_distribution(self, startpoint, endpoint, filename="{}_diffrtt_distribution.pdf", expid=1):
+    def diffrtt_distribution(self, startpoint, endpoint, filename="{}_{}_diffrtt_distribution.pdf", expid=1):
         """Plot the distribution of differential RTT values for the given start
         and end points. """
         
@@ -102,20 +104,28 @@ class Plotter(object):
         plt.ylim([0, 1.1])
 
         fig.tight_layout()
+        fname = self.fig_directory+filename.format(startpoint, endpoint)
         fig.savefig(filename)
 
 
-    def metric_over_time(self, startpoint, endpoint, metric="median", filename="fig/{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, probe_geoloc=None, group = True, label=None, startpoint_label=None, endpoint_label=None):
+    def metric_over_time(self, startpoint, endpoint, metric="median", filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, probe_geoloc=None, group = True, label=None, startpoint_label=None, endpoint_label=None):
 
         all_df = []
         endpoint_label = endpoint if endpoint_label is None else endpoint_label
         startpoint_label = startpoint if startpoint_label is None else startpoint_label
 
+        logging.warn("query db")
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples FROM diffrtt where expid=? and startpoint like ? and endpoint like ? order by ts" , conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query( 
+                    ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples "
+                    "FROM diffrtt "
+                    "WHERE expid=? and startpoint like ? and endpoint like ? "), 
+                    conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
             
+        logging.warn("format data")
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
+        logging.warn("data ready")
 
         # Geolocate probes if needed
         if probe_geoloc is not None:
@@ -159,16 +169,16 @@ class Plotter(object):
                 plt.legend(loc='best', ncol=4, fontsize=8 )
             # plt.tight_layout()
             if not group:
-                fname = filename.format(locations[0], locations[1], metric, expid)
+                fname = self.fig_directory+filename.format(locations[0], locations[1], metric, expid)
                 plt.savefig(fname)
 
         if group:
             plt.title("{} to {}".format(startpoint_label, endpoint_label))
-            fname = filename.format(startpoint_label, endpoint_label, metric, expid)
+            fname = self.fig_directory+filename.format(startpoint_label, endpoint_label, metric, expid)
             plt.savefig(fname)
 
 
-    def profile_endpoint(self, endpoint, filename="fig/{}_profile_{}_expid{}.pdf", expid=1, tz="UTC", ylim=None):
+    def profile_endpoint(self, endpoint, filename="{}_profile_{}_expid{}.pdf", expid=1, tz="UTC", ylim=None):
 
 
         all_df = []
@@ -198,7 +208,7 @@ class Plotter(object):
         plt.title("Weekday: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
         plt.ylim(ylim)
         # plt.tight_layout()
-        fname = filename.format(endpoint, "weekday", expid)
+        fname = self.fig_directory+filename.format(endpoint, "weekday", expid)
         plt.savefig(fname)
 
         fig = plt.figure(figsize=(6,4))
@@ -210,7 +220,7 @@ class Plotter(object):
         plt.title("Weekend: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
         plt.ylim(ylim)
         # plt.tight_layout()
-        fname = filename.format(endpoint, "weekend", expid)
+        fname = self.fig_directory+filename.format(endpoint, "weekend", expid)
         plt.savefig(fname)
 
 
