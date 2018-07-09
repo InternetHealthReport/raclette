@@ -57,6 +57,7 @@ class Raclette():
         self.tm_expiration = int(config.get("tracksaggregator", "expiration"))
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
+        self.tm_min_tracks = int(config.get("tracksaggregator", "min_tracks"))
 
         self.saver_filename = config.get("io", "results")
         self.log_filename = config.get("io", "log")
@@ -85,7 +86,7 @@ class Raclette():
         for date, results in aggregates.iteritems():
             saver_queue.put("BEGIN TRANSACTION;")
             for locations, agg in results.iteritems():
-                entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"], agg["nb_samples"], agg["nb_probes"], agg["entropy"]))
+                entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"], agg["nb_tracks"], agg["nb_probes"], agg["entropy"]))
                 saver_queue.put(entry)
             saver_queue.put("COMMIT;")
 
@@ -122,7 +123,7 @@ class Raclette():
             logging.error("Time track converter ({}) unknown".format(self.timetrack_converter))
             return
 
-        tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level)
+        tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
 
         saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 

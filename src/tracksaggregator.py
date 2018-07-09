@@ -24,9 +24,10 @@ class TracksAggregator():
     wilson score for each time bin.
     """
 
-    def __init__(self, window_size, expiration, significance_level):
+    def __init__(self, window_size, expiration, significance_level, min_tracks):
         self.window_size = window_size
         self.significance_level = significance_level
+        self.min_tracks = min_tracks
         self.nb_ignored_tracks = 0
         self.nb_empty_tracks = 0
         self.nb_tracks = 0
@@ -66,7 +67,7 @@ class TracksAggregator():
         unique probes."""
 
         results = {}
-        counters = defaultdict(lambda: {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int)})
+        counters = defaultdict(lambda: {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int), "nb_tracks": 0})
 
         for track in tracks:
             for locPair in combinations(track["rtts"],2):
@@ -76,11 +77,12 @@ class TracksAggregator():
                 count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
                 count["nb_tracks_per_asn"][track["from_asn"]] += 1
                 count["unique_probes"].add(track["prb_id"])
+                count["nb_tracks"] += 1
 
         # Compute median/wilson scores 
         wilson_conf = None
         for locations, count in counters.iteritems():
-            if len(count["diffrtt"])<27:
+            if count["nb_tracks"]<self.min_tracks:
                 continue
 
             count["diffrtt"].sort()
@@ -98,7 +100,7 @@ class TracksAggregator():
                     "conf_low": count["diffrtt"][int(wilson_conf[0])],
                     "conf_high": count["diffrtt"][int(wilson_conf[1])],
                     "median": count["diffrtt"][int(len(count["diffrtt"])/2)],
-                    "nb_samples": len(count["diffrtt"]),
+                    "nb_tracks": count["nb_tracks"],
                     "nb_probes": len(count["unique_probes"]),
                     "entropy": entropy
                     }
