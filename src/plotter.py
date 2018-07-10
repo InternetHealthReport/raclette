@@ -84,6 +84,23 @@ class Plotter(object):
         return geoloc[0][resolution]
 
 
+    def replace_by_probe_geoloc(self, diffrtt, resolution):
+        """Replace probes in the given DataFrame by their geolocation. The resolution 
+        parameter can take the following values: cc, name, admin1, admin2"""
+
+        geo_loc = {}
+        nb_probes_per_geo = defaultdict(int)
+        for loc in diffrtt["startpoint"].unique():
+            if loc.startswith("PB"):
+                geo = self.probe_geo_loc(int(loc[2:]), resolution)
+                geo_loc[loc] = geo
+                nb_probes_per_geo[geo] += 1
+
+        diffrtt["startpoint"] = diffrtt["startpoint"].replace(geo_loc.keys(), geo_loc.values())
+
+        return diffrtt, nb_probes_per_geo
+
+
     def diffrtt_distribution(self, startpoint, endpoint, filename="{}_{}_diffrtt_distribution.pdf", expid=1):
         """Plot the distribution of differential RTT values for the given start
         and end points. """
@@ -112,40 +129,30 @@ class Plotter(object):
         fig.savefig(filename)
 
 
-    def metric_over_time(self, startpoint, endpoint, metric="median", filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, probe_geoloc=None, group = True, label=None, startpoint_label=None, endpoint_label=None):
+    def metric_over_time(self, startpoint, endpoint, metric="median", filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, geo_resolution=None, group = True, label=None, startpoint_label=None, endpoint_label=None):
 
         all_df = []
         endpoint_label = endpoint if endpoint_label is None else endpoint_label
         startpoint_label = startpoint if startpoint_label is None else startpoint_label
 
-        logging.warn("query db")
         for conn in self.conn:
-        all_df.append(pd.read_sql_query( 
-                ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbsamples " # TODO change to nbtracks
+            all_df.append(pd.read_sql_query( 
+                ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks, nbprobes " 
                 "FROM diffrtt "
-                "WHERE expid=? and startpoint like ? and endpoint like ? "), 
+                "WHERE expid=? and startpoint like ? and endpoint like ? "
+                "ORDER BY ts"), 
                 conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
             
-        logging.warn("format data")
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
-        logging.warn("data ready")
 
         # Geolocate probes if needed
-        if probe_geoloc is not None:
-            geo_loc = {}
-            nb_probes_per_geo = defaultdict(int)
-            for loc in diffrtt["startpoint"].unique():
-                if loc.startswith("PB"):
-                    geo = self.probe_geo_loc(int(loc[2:]), probe_geoloc)
-                    geo_loc[loc] = geo
-                    nb_probes_per_geo[geo] += 1
-
-            diffrtt["startpoint"] = diffrtt["startpoint"].replace(geo_loc.keys(), geo_loc.values())
+        if geo_resolution is not None:
+            diffrtt, nb_probes_per_geo = self.replace_by_probe_geoloc(diffrtt, geo_resolution)
 
         diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
-        nbtracks_avg = diffrtt["nbsamples"].mean() # TODO change to nbtracks
+        nbtracks_avg = diffrtt["nbtracks"].mean()
         logging.warn("{} average samples".format(nbtracks_avg))
 
         if group:
@@ -182,50 +189,70 @@ class Plotter(object):
             plt.savefig(fname)
 
 
-    def profile_endpoint(self, endpoint, filename="{}_profile_{}_expid{}.pdf", expid=1, tz="UTC", ylim=None):
+    def profile_endpoint(self, endpoint, filename="{}_{}_profile_{}_expid{}.pdf", 
+            expid=1, tz="UTC", ylim=None, geo_resolution="cc"):
 
 
         all_df = []
         for conn in self.conn:
-            all_df.append(pd.read_sql_query("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks FROM diffrtt where expid=? and endpoint=? order by ts" , conn, "ts", params=(expid, endpoint), parse_dates=["ts"]) )
+            all_df.append(pd.read_sql_query( 
+                ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks "
+                    "FROM diffrtt where expid=? AND endpoint=? "
+                    "ORDER BY ts") , 
+                    conn, "ts", params=(expid, endpoint), parse_dates=["ts"]) )
             
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
         if tz != "UTC":
             diffrtt.index = diffrtt.index.tz_convert(tz)
 
+        diffrtt, nb_probes_per_geo = self.replace_by_probe_geoloc(diffrtt, geo_resolution)
+
+        diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
+
         nbtracks_avg= diffrtt["nbtracks"].mean()
         logging.warn("{} average samples".format(nbtracks_avg))
+        for locations, data in diffrtt_grp:
 
-        # Split weekday and weekend
-        weekday = diffrtt[diffrtt.index.weekday<5]
-        weekend = diffrtt[diffrtt.index.weekday>4]
-        weekday_avg = weekday.groupby(weekday.index.hour).median()
-        weekend_avg = weekend.groupby(weekend.index.hour).median()
+            # Split weekday and weekend
+            weekday = data[data.index.weekday<5]
+            weekend = data[data.index.weekday>4]
+            weekday_avg = weekday.groupby(weekday.index.hour).median()
+            weekend_avg = weekend.groupby(weekend.index.hour).median()
 
-        fig = plt.figure(figsize=(6,4))
-        plt.plot(weekday_avg["median"])
-        plt.plot(weekday_avg["confhigh"])
-        plt.plot(weekday_avg["conflow"])
-        plt.ylabel("Differential RTT (ms)")
-        plt.xlabel("Time ({})".format(tz))
-        plt.title("Weekday: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
-        plt.ylim(ylim)
-        # plt.tight_layout()
-        fname = self.fig_directory+filename.format(endpoint, "weekday", expid)
-        plt.savefig(fname)
+            fig = plt.figure(figsize=(6,4))
+            plt.plot(weekday_avg["median"])
+            plt.plot(weekday_avg["confhigh"])
+            plt.plot(weekday_avg["conflow"])
+            plt.ylabel("Differential RTT (ms)")
+            plt.xlabel("Time ({})".format(tz))
+            plt.title("Weekday: {} ({}), {} probes".format(endpoint, locations[0], nb_probes_per_geo[locations[0]]))
+            plt.ylim(ylim)
+            # plt.tight_layout()
+            fname = self.fig_directory+filename.format(locations[0], endpoint, "weekday", expid)
+            plt.savefig(fname)
 
-        fig = plt.figure(figsize=(6,4))
-        plt.plot(weekend_avg["median"])
-        plt.plot(weekend_avg["confhigh"])
-        plt.plot(weekend_avg["conflow"])
-        plt.ylabel("Average Differential RTT (ms)")
-        plt.xlabel("Time ({})".format(tz))
-        plt.title("Weekend: {}, {} probes".format(endpoint, len(diffrtt["startpoint"].unique())))
-        plt.ylim(ylim)
-        # plt.tight_layout()
-        fname = self.fig_directory+filename.format(endpoint, "weekend", expid)
-        plt.savefig(fname)
+            fig = plt.figure(figsize=(6,4))
+            plt.plot(weekend_avg["median"])
+            plt.plot(weekend_avg["confhigh"])
+            plt.plot(weekend_avg["conflow"])
+            plt.ylabel("Average Differential RTT (ms)")
+            plt.xlabel("Time ({})".format(tz))
+            plt.title("Weekend: {} ({}), {} probes".format(endpoint, locations[0], nb_probes_per_geo[locations[0]]))
+            plt.ylim(ylim)
+            # plt.tight_layout()
+            fname = self.fig_directory+filename.format(locations[0], endpoint, "weekend", expid)
+            plt.savefig(fname)
+
+    def first_hop_analysis(self, asns, geo_resolution="cc", expid=1, label=None, ylim=None, tz="UTC"):
+        """Plot the median RTT over time and daily profile for all asns given in asns.
+        Assume these ASNs are access networks hosting probes."""
+        for asn in asns:
+            logging.info("Plotting {}".format(asn))
+            self.metric_over_time("%", asn, geo_resolution=geo_resolution, group=False, expid=expid, label=label, ylim=ylim)
+            self.metric_over_time("%", asn, metric="nbtracks", geo_resolution=geo_resolution, group=False, expid=expid, label=label)
+            self.metric_over_time("%", asn, metric="nbprobes", geo_resolution=geo_resolution, group=False, expid=expid, label=label)
+            self.profile_endpoint(asn, expid=expid, geo_resolution=geo_resolution, tz=tz)
 
 
 if __name__ == "__main__":
