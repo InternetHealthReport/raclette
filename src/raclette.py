@@ -119,6 +119,10 @@ class Raclette():
             from astimetrack import ASTimeTrack
             timetrackconverter = ASTimeTrack(i2a)
 
+        elif self.timetrack_converter == "anchorcitytimetrack":
+            from anchorcitytimetrack import AnchorCityTimeTrack
+            timetrackconverter = AnchorCityTimeTrack(i2a)
+
         else:
             logging.error("Time track converter ({}) unknown".format(self.timetrack_converter))
             return
