@@ -258,7 +258,7 @@ class Plotter(object):
 if __name__ == "__main__":
    
     if len(sys.argv)<4:
-        print("usage: {} db startpoint enpoint")
+        print("usage: {} db startpoint enpoint".format(sys.argv[0]) )
         sys.exit()
 
     db = sys.argv[1]
