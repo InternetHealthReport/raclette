@@ -129,7 +129,26 @@ class Plotter(object):
         fig.savefig(filename)
 
 
-    def metric_over_time(self, startpoint, endpoint, metric="median", filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", ylim=None, geo_resolution=None, group = True, label=None, startpoint_label=None, endpoint_label=None):
+    def metric_over_time(self, startpoint, endpoint, metric="median", 
+            filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", 
+            ylim=None, geo_resolution=None, group = True, label=None, 
+            startpoint_label=None, endpoint_label=None):
+        """Plot a metric (e.g. median, nbtracks, or nbpobes) for the given locations.
+
+        Args:
+            startpoint (str): The start location. It can be a SQL regular expression 
+            to match several locations (e.g. 'PB%' select all probes).
+            endpoint (str): The end location. It can be a SQL regular expression 
+            to match several locations (e.g. 'PB%' select all probes).
+            metric (str): A column name from the database (median, confhigh, 
+            conflow, nbtracks, nbprobes).
+            ylim (list): The upper and lower bound for the y axis.
+            geo_resolution (str): Replace probes by their geolocation if set to
+            'name', 'admin1', 'admin2', or 'cc'.
+            group (bool): Plot all graph in one figure if True.
+
+
+        """
 
         all_df = []
         endpoint_label = endpoint if endpoint_label is None else endpoint_label
@@ -156,35 +175,39 @@ class Plotter(object):
         logging.warn("{} average samples".format(nbtracks_avg))
 
         if group:
-            fig = plt.figure(figsize=(8,4))
+            fig = plt.figure(figsize=(6,3))
 
         for locations, data in diffrtt_grp:
             if data["nbtracks"].mean()<nbtracks_avg/2.0:
                 continue
             if not group :
-                fig = plt.figure(figsize=(8,4))
+                fig = plt.figure(figsize=(6,3))
             # Ignore locations with a small number of samples
             if group:
-                x_label = str(locations) if label is None else label
+                x_label = "{} to {}".format(locations[0], locations[1]) if label is None else label
                 plt.plot(data[metric], label=x_label)
             else:
                 plt.plot(data[metric], label=label)
-                plt.title("{} to {} ({} probes)".format(locations[0], locations[1], nb_probes_per_geo[locations[0]]))
+                plt.title("{} to {} ({} probes)".format(
+                    locations[0], locations[1], 
+                    nb_probes_per_geo[locations[0]]))
         
             plt.gca().xaxis_date(tz)
             plt.ylabel("Differential RTT (ms)")
             plt.xlabel("Time ({})".format(tz))
             plt.ylim(ylim)
             fig.autofmt_xdate() 
-            if label is not None or group:
-                plt.legend(loc='best', ncol=4, fontsize=8 )
-            # plt.tight_layout()
+            if label is not None or (group and len(diffrtt_grp)>1):
+                # plt.legend(loc='best', ncol=4, fontsize=8 )
+                plt.legend(loc='best')
             if not group:
+                plt.tight_layout()
                 fname = self.fig_directory+filename.format(locations[0], locations[1], metric, expid)
                 plt.savefig(fname)
 
         if group:
             plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            plt.tight_layout()
             fname = self.fig_directory+filename.format(startpoint_label, endpoint_label, metric, expid)
             plt.savefig(fname)
 

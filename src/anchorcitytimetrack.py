@@ -17,7 +17,7 @@ class AnchorCityTimeTrack():
         for probe in probes:
             lon, lat = probe["geometry"]["coordinates"]
             geoloc = rg.search((lat, lon))
-            probe["city"] = geoloc[0]["name"]
+            probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
             self.anchor_info[probe["address_v4"]] = probe
             self.anchor_info[probe["address_v6"]] = probe
 
@@ -34,7 +34,7 @@ class AnchorCityTimeTrack():
         if trace is None or "error" in trace["result"][0] or "err" in trace["result"][0]["result"]:
             return None
 
-        probe_asn = self.i2a.ip2asn(trace["from"]) if (trace.get("from", "")) else "Unk"
+        probe_asn = self.i2a.ip2asn(trace["from"]) if (trace.get("from", "")) else "Unk (PB{})".format(trace["prb_id"])
         timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
                 "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
