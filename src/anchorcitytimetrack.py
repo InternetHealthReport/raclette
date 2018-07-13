@@ -21,6 +21,7 @@ class AnchorCityTimeTrack():
             self.anchor_info[probe["address_v4"]] = probe
             self.anchor_info[probe["address_v6"]] = probe
 
+
     def traceroute2timetrack(self, trace):
 	"""Read a single traceroute result and get rtts for the destination city
 	"""
@@ -37,7 +38,7 @@ class AnchorCityTimeTrack():
         timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
                 "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
-        source_city = self.anchor_info[trace["from"]]["city"]
+        source_city = self.anchor_info[trace["from"]]["city"] if trace["from"] in self.anchor_info else "Unk"
         timetrack["rtts"].append((source_city, [0]))
 
 	hop = trace["result"][-1]
@@ -45,14 +46,18 @@ class AnchorCityTimeTrack():
         if "result" not in hop :
             return None
 
-        dest_city = self.anchor_info[res["from"]]["city"]
+        dest_city = self.anchor_info[trace["dst_addr"]]["city"] if trace["dst_addr"] in self.anchor_info else "Unk"
         timetrack["rtts"].append( (dest_city, []) )
+        no_rtt = True
         for res in hop["result"]:
             if not "from" in res  or tools.isPrivateIP(res["from"]) \
                     or not "rtt" in res or res["rtt"] <= 0.0 \
                     or res["from"] != trace["dst_addr"]:
                 continue
-
+            no_rtt = False
             timetrack["rtts"][-1][1].append(res["rtt"])
 
-        return timetrack
+        if no_rtt:
+            return None
+        else:
+            return timetrack

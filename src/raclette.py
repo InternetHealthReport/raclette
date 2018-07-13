@@ -140,7 +140,7 @@ class Raclette():
             for track in tr_reader.read():
                 if not track:
                     continue
-                
+
                 if self.add_probe:
                     track["rtts"] = [(track["prb_id"], [0])] + track["rtts"]
                 
