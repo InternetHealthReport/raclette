@@ -201,14 +201,16 @@ class Plotter(object):
                 plt.legend(loc='best')
             
             if not group:
-                plt.tight_layout()
+                fig.autofmt_xdate()
                 plt.ylim(ylim)
+                plt.tight_layout()
                 fname = self.fig_directory+filename.format(locations[0], locations[1], metric, expid)
                 fname = fname.replace(" ","_").replace(",","")
                 plt.savefig(fname)
 
         if group:
             plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            fig.autofmt_xdate()
             plt.ylim(ylim)
             plt.tight_layout()
             fname = self.fig_directory+filename.format(startpoint_label, endpoint_label, metric, expid)
