@@ -126,6 +126,7 @@ class Plotter(object):
 
         fig.tight_layout()
         fname = self.fig_directory+filename.format(startpoint, endpoint)
+        fname = fname.replace(" ","_").replace(",","")
         fig.savefig(filename)
 
 
@@ -194,26 +195,43 @@ class Plotter(object):
         
             plt.gca().xaxis_date(tz)
             plt.ylabel("Differential RTT (ms)")
+            # plt.ylabel("RTT (ms)")
             plt.xlabel("Time ({})".format(tz))
-            plt.ylim(ylim)
-            fig.autofmt_xdate() 
             if label is not None or (group and len(diffrtt_grp)>1):
-                # plt.legend(loc='best', ncol=4, fontsize=8 )
                 plt.legend(loc='best')
+            
             if not group:
                 plt.tight_layout()
+                plt.ylim(ylim)
                 fname = self.fig_directory+filename.format(locations[0], locations[1], metric, expid)
+                fname = fname.replace(" ","_").replace(",","")
                 plt.savefig(fname)
 
         if group:
             plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            plt.ylim(ylim)
             plt.tight_layout()
             fname = self.fig_directory+filename.format(startpoint_label, endpoint_label, metric, expid)
+            fname = fname.replace(" ","_").replace(",","")
             plt.savefig(fname)
 
 
     def profile_endpoint(self, endpoint, filename="{}_{}_profile_{}_expid{}.pdf", 
             expid=1, tz="UTC", ylim=None, geo_resolution="cc"):
+        """Plot the daily delay profile for the given endpoint.
+        
+        Compute the median delay for each hour of the day and plot a 24h profile.
+        Weekdays and weekends are plotted separately.
+        
+        Args:
+            endpoint (str): Select all differential RTTs to this end location.
+            filename (str): Filename for the plots.
+            expid (int): Experiment ID for selecting the correct results.
+            tz (str): Project the profile in the given time zone.
+            ylim (list): Force the lower and upper bound for the y axis.
+            geo_resolution (str): Replace probes by their geolocation. Possible
+            values are: 'name', 'admin1', 'admin2', or 'cc'.
+        """
 
 
         all_df = []
@@ -253,6 +271,7 @@ class Plotter(object):
             plt.ylim(ylim)
             # plt.tight_layout()
             fname = self.fig_directory+filename.format(locations[0], endpoint, "weekday", expid)
+            fname = fname.replace(" ","_").replace(",","")
             plt.savefig(fname)
 
             fig = plt.figure(figsize=(6,4))
@@ -265,6 +284,7 @@ class Plotter(object):
             plt.ylim(ylim)
             # plt.tight_layout()
             fname = self.fig_directory+filename.format(locations[0], endpoint, "weekend", expid)
+            fname = fname.replace(" ","_").replace(",","")
             plt.savefig(fname)
 
     def first_hop_analysis(self, asns, geo_resolution="cc", expid=1, label=None, ylim=None, tz="UTC"):
