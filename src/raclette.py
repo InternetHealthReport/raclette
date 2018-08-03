@@ -3,8 +3,8 @@ import os
 import logging
 import datetime
 from collections import defaultdict
-import cPickle as pickle
-import ConfigParser
+import pickle
+import configparser
 import argparse
 from multiprocessing import Process, Pool, JoinableQueue, Pipe
 import importlib
@@ -36,7 +36,7 @@ class Raclette():
         args = parser.parse_args()
 
         # Read the config file
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.read(args.config_file)
 
         self.atlas_start =  tools.valid_date(config.get("io", "start"))
@@ -84,9 +84,9 @@ class Raclette():
         Save differential RTTs values on disk.
         """
 
-        for date, results in aggregates.iteritems():
+        for date, results in aggregates.items():
             saver_queue.put("BEGIN TRANSACTION;")
-            for locations, agg in results.iteritems():
+            for locations, agg in results.items():
                 entry = ("diffrtt", 
                         (date, locations[0], locations[1], agg["median"], 
                             agg["conf_high"], agg["conf_low"], agg["nb_tracks"],

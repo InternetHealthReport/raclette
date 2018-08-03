@@ -7,7 +7,8 @@ from ripe.atlas.cousteau import AtlasResultsRequest
 
 TT_CONVERTER = None
 
-def get_results((semaphore,kwargs), retry=3):
+def get_results(param, retry=3):
+    semaphore,kwargs = param
 
     global TT_CONVERTER
     if retry==3:
@@ -21,7 +22,7 @@ def get_results((semaphore,kwargs), retry=3):
     else:
         logging.warning("Atlas request failed for {}".format(kwargs))
         if retry > 0:
-            return get_results((semaphore,kwargs), retry-1)
+            return get_results(param, retry-1)
         else:
             logging.error("All retries failed for {}".format(kwargs))
             return None
@@ -70,7 +71,6 @@ class AtlasRestReader():
 
 
     def read(self):
-        # return itertools.chain.from_iterable(self.pool.imap(get_results, params))
         for tracks in self.pool.imap(get_results, self.params):
             for track in tracks:
                 yield track
@@ -87,4 +87,4 @@ class AtlasRestReader():
 if __name__ == "__main__":
     with AtlasRestReader(datetime.datetime(2018,6,1,0,0), datetime.datetime(2018,6,2,0,0)) as arr:
             for tr in arr:
-                print tr
+                print(tr)
