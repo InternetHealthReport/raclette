@@ -62,15 +62,22 @@ class TracksAggregator():
 
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
-        The returned dictionnary contains the differential median RTT, wilson 
-        scores, entropy of probes ASN, number of diff. RTT samples, number of 
-        unique probes."""
+        The returned dictionnary provides for each pair of locations found in the
+        tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
+        number of diff. RTT samples, number of unique probes."""
 
         results = {}
-        counters = defaultdict(lambda: {"diffrtt": [], "unique_probes": set(), "nb_tracks_per_asn": defaultdict(int), "nb_tracks": 0})
+        counters = defaultdict(lambda: {
+            "diffrtt": [], 
+            "unique_probes": set(),
+            "nb_tracks_per_asn": defaultdict(int),
+            "nb_tracks": 0,
+            "hop": []
+            })
 
         for track in tracks:
-            for locPair in combinations(track["rtts"],2):
+            nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
+            for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
                 (loc0, rtts0) = locPair[0]
                 (loc1, rtts1) = locPair[1]
                 count = counters[(loc0,loc1)]
@@ -78,6 +85,7 @@ class TracksAggregator():
                 count["nb_tracks_per_asn"][track["from_asn"]] += 1
                 count["unique_probes"].add(track["prb_id"])
                 count["nb_tracks"] += 1
+                count["hop"].append(hop)
 
         # Compute median/wilson scores 
         wilson_conf = None
@@ -92,7 +100,10 @@ class TracksAggregator():
             if len(count["diffrtt"]) in self.wilson_cache:
                 wilson_conf = self.wilson_cache[len(count["diffrtt"])]
             else:
-                wilson_conf = sm.stats.proportion_confint(len(count["diffrtt"])/2, len(count["diffrtt"]), self.significance_level, "wilson")
+                wilson_conf = sm.stats.proportion_confint(
+                        len(count["diffrtt"])/2, 
+                        len(count["diffrtt"]), 
+                        self.significance_level, "wilson")
                 wilson_conf = np.array(wilson_conf)*len(count["diffrtt"])
                 self.wilson_cache[len(count["diffrtt"])] = wilson_conf 
 
@@ -102,7 +113,8 @@ class TracksAggregator():
                     "median": count["diffrtt"][int(len(count["diffrtt"])/2)],
                     "nb_tracks": count["nb_tracks"],
                     "nb_probes": len(count["unique_probes"]),
-                    "entropy": entropy
+                    "entropy": entropy,
+                    "hop": np.median(count["hop"])
                     }
 
         return results
@@ -131,7 +143,8 @@ class TracksAggregator():
                     logging.info("Processing bin {}".format(date))
                     expired_bins.append(date)
 
-                    results[date*self.window_size+self.window_size/2] = self.compute_median_diff_rtt(tracks)
+                    timebin = date*self.window_size+self.window_size/2
+                    results[timebin] = self.compute_median_diff_rtt(tracks)
                     self.nb_expired_tracks += len(tracks)
                     self.nb_expired_bins += 1
 

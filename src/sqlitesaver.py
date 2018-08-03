@@ -37,7 +37,7 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment (id integer primary key, date text, cmd text, args text)")
 
         # Table storing aggregated differential RTTs 
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt (ts integer, startpoint text, endpoint text, median real, confhigh real, conflow real, nbtracks integer, nbprobes interger, entropy real, expid integer, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt (ts integer, startpoint text, endpoint text, median real, confhigh real, conflow real, nbtracks integer, nbprobes integer, entropy real, hop integer, expid integer, foreign key(expid) references experiment(id))")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON diffrtt (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON diffrtt (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON diffrtt (endpoint)")
@@ -68,13 +68,13 @@ class SQLiteSaver(multiprocessing.Process):
             return
 
         elif t == "diffrtt":
-            ts, startpoint, endpoint, median, high, low, nb_tracks, nb_probes, entropy  = data
+            ts, startpoint, endpoint, median, high, low, nb_tracks, nb_probes, entropy, hop = data
 
             if self.prevts != ts:
                 self.prevts = ts
                 logging.info("start recording diff. RTTs (ts={})".format(ts))
             
-            self.cursor.execute("INSERT INTO diffrtt(ts, startpoint, endpoint, median, confhigh, conflow, nbtracks, nbprobes, entropy, expid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (ts, startpoint, endpoint, median, high, low, nb_tracks, nb_probes, entropy, self.expid) )
+            self.cursor.execute("INSERT INTO diffrtt(ts, startpoint, endpoint, median, confhigh, conflow, nbtracks, nbprobes, entropy, hop, expid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (ts, startpoint, endpoint, median, high, low, nb_tracks, nb_probes, entropy, hop, self.expid) )
                     # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )
 
         elif t == "delayanomaly":

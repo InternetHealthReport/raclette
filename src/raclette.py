@@ -7,6 +7,7 @@ import cPickle as pickle
 import ConfigParser
 import argparse
 from multiprocessing import Process, Pool, JoinableQueue, Pipe
+import importlib
 
 import tools
 from dumpReader import DumpReader
@@ -86,7 +87,10 @@ class Raclette():
         for date, results in aggregates.iteritems():
             saver_queue.put("BEGIN TRANSACTION;")
             for locations, agg in results.iteritems():
-                entry = ("diffrtt", (date, locations[0], locations[1], agg["median"], agg["conf_high"], agg["conf_low"], agg["nb_tracks"], agg["nb_probes"], agg["entropy"]))
+                entry = ("diffrtt", 
+                        (date, locations[0], locations[1], agg["median"], 
+                            agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
+                            agg["nb_probes"], agg["entropy"], agg["hop"]))
                 saver_queue.put(entry)
             saver_queue.put("COMMIT;")
 
@@ -111,20 +115,11 @@ class Raclette():
         import ip2asn
         i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
 
-        if self.timetrack_converter == "firsthoptimetrack":
-            from firsthoptimetrack import FirstHopTimeTrack
-            timetrackconverter = FirstHopTimeTrack(i2a)
-
-        elif self.timetrack_converter == "astimetrack":
-            from astimetrack import ASTimeTrack
-            timetrackconverter = ASTimeTrack(i2a)
-
-        elif self.timetrack_converter == "anchorcitytimetrack":
-            from anchorcitytimetrack import AnchorCityTimeTrack
-            timetrackconverter = AnchorCityTimeTrack(i2a)
-
-        else:
-            logging.error("Time track converter ({}) unknown".format(self.timetrack_converter))
+        try:
+            timetrac_module = importlib.import_module("timetrack."+self.timetrack_converter)
+            timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
+        except ImportError:
+            logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
             return
 
         tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
