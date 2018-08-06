@@ -86,12 +86,13 @@ class Raclette():
 
         for date, results in aggregates.items():
             saver_queue.put("BEGIN TRANSACTION;")
-            for locations, agg in results.items():
-                entry = ("diffrtt", 
-                        (date, locations[0], locations[1], agg["median"], 
-                            agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
-                            agg["nb_probes"], agg["entropy"], agg["hop"]))
-                saver_queue.put(entry)
+            [saver_queue.put(
+                    ("diffrtt", 
+                    (date, locations[0], locations[1], agg["median"], 
+                        agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
+                        agg["nb_probes"], agg["entropy"], agg["hop"]))
+                )
+                for locations, agg in results.items()]
             saver_queue.put("COMMIT;")
 
 
@@ -163,3 +164,4 @@ if __name__ == "__main__":
     ra = Raclette()
     ra.read_config()
     ra.main() 
+
