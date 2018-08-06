@@ -72,6 +72,7 @@ class AtlasRestReader():
 
     def read(self):
         for tracks in self.pool.imap(get_results, self.params):
+        # for tracks in map(get_results, self.params):
             for track in tracks:
                 yield track
             
@@ -88,3 +89,4 @@ if __name__ == "__main__":
     with AtlasRestReader(datetime.datetime(2018,6,1,0,0), datetime.datetime(2018,6,2,0,0)) as arr:
             for tr in arr:
                 print(tr)
+
