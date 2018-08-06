@@ -49,8 +49,9 @@ class AtlasRestReader():
 
     def __enter__(self):    
         self.params = []
-        self.pool = multiprocessing.Pool(processes=8) 
-        self.semaphore = multiprocessing.Manager().Semaphore(100) 
+        logging.warn("creating the pool")
+        self.pool = multiprocessing.Pool(processes=4) 
+        self.semaphore = multiprocessing.Manager().Semaphore(50) 
 
         window_start = self.start
         while window_start+datetime.timedelta(seconds=self.chunk_size) <= self.end:
@@ -63,6 +64,7 @@ class AtlasRestReader():
                         }
                 self.params.append([self.semaphore,kwargs])
             window_start += datetime.timedelta(seconds=self.chunk_size)
+        logging.warn("pool ready")
 
         return self
     
@@ -73,15 +75,15 @@ class AtlasRestReader():
     def read(self):
         for tracks in self.pool.imap(get_results, self.params):
         # for tracks in map(get_results, self.params):
-            for track in tracks:
-                yield track
+            yield from tracks
             
             self.semaphore.release()
 
 
     def close(self): 
         if self.pool is not None: 
-            self.pool.terminate()
+            self.pool.close()
+            self.pool.join()
         return False
 
 
