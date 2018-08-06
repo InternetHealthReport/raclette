@@ -102,7 +102,7 @@ class Raclette():
         """
 
         # Initialisation
-        saver_queue = JoinableQueue(100000)
+        saver_queue = JoinableQueue(1000000)
         detector_pipe = Pipe(False)
 
         # These are run in a separate process

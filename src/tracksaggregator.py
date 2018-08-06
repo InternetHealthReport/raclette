@@ -40,9 +40,7 @@ class TracksAggregator():
 
 
     def add_track(self, track):
-        """Add a new track to the history.
-        
-        """
+        """Add a new track to the history."""
 
         self.nb_tracks += 1
         if not track :
@@ -56,42 +54,42 @@ class TracksAggregator():
 
         # index track based on its timestamp
         if bin_id not in self.track_bins:
-            self.track_bins[bin_id] = defaultdict(
-                    lambda: {
-                        "diffrtt": [], 
-                        "unique_probes": set(),
-                        "nb_tracks_per_asn": defaultdict(int),
-                        "nb_tracks": 0,
-                        "hop": []
-                    })
+            self.track_bins[bin_id] = []
 
-        # Compute diffrtt and merge results with past tracks
-        counters = self.track_bins[bin_id]
-        nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
-        for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
-            (loc0, rtts0) = locPair[0]
-            (loc1, rtts1) = locPair[1]
-            count = counters[(loc0,loc1)]
-            count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
-            count["nb_tracks_per_asn"][track["from_asn"]] += 1
-            count["unique_probes"].add(track["prb_id"])
-            count["nb_tracks"] += 1
-            count["hop"].append(hop)
-
+        self.track_bins[bin_id].append(track)
         self.bins_last_insert[bin_id] = self.nb_tracks
 
 
-    def compute_median_diff_rtt(self, bin_id):
+    def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
         The returned dictionnary provides for each pair of locations found in the
         tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
         number of diff. RTT samples, number of unique probes."""
 
         results = {}
+        counters = defaultdict(lambda: {
+            "diffrtt": [], 
+            "unique_probes": set(),
+            "nb_tracks_per_asn": defaultdict(int),
+            "nb_tracks": 0,
+            "hop": []
+            })
+
+        for track in tracks:
+            nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
+            for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
+                (loc0, rtts0) = locPair[0]
+                (loc1, rtts1) = locPair[1]
+                count = counters[(loc0,loc1)]
+                count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
+                count["nb_tracks_per_asn"][track["from_asn"]] += 1
+                count["unique_probes"].add(track["prb_id"])
+                count["nb_tracks"] += 1
+                count["hop"].append(hop)
 
         # Compute median/wilson scores 
         wilson_conf = None
-        for locations, count in self.track_bins[bin_id].items():
+        for locations, count in counters.items():
             if count["nb_tracks"]<self.min_tracks:
                 continue
 
@@ -146,7 +144,7 @@ class TracksAggregator():
                     expired_bins.append(date)
 
                     timebin = date*self.window_size+self.window_size/2
-                    results[timebin] = self.compute_median_diff_rtt(date)
+                    results[timebin] = self.compute_median_diff_rtt(tracks)
                     self.nb_expired_tracks += len(tracks)
                     self.nb_expired_bins += 1
                     logging.info("Finished processing bin {}".format(date))

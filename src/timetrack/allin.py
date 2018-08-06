@@ -13,16 +13,16 @@ class TimeTrackConverter():
         self.probe_info = {}
         logging.info("Loading probes info...")
         filters = {"tags": "system-anchor"}
-        probes = ProbeRequest(**filters)
-        for probe in probes:
-            try:
-                lon, lat = probe["geometry"]["coordinates"]
-                geoloc = rg.search((lat, lon))
-                probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
-                self.probe_info[probe["address_v4"]] = probe
-                self.probe_info[probe["address_v6"]] = probe
-            except TypeError:
-                continue
+        # probes = ProbeRequest(**filters)
+        # for probe in probes:
+            # try:
+                # lon, lat = probe["geometry"]["coordinates"]
+                # geoloc = rg.search((lat, lon))
+                # probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
+                # self.probe_info[probe["address_v4"]] = probe
+                # self.probe_info[probe["address_v6"]] = probe
+            # except TypeError:
+                # continue
         logging.info("Ready to convert traceroutes!")
 
 
@@ -51,15 +51,19 @@ class TimeTrackConverter():
             if "result" in hop :
 
                 router_ip = ""
+                router_asn= ""
                 for res in hop["result"]:
-                    if not "from" in res  or tools.isPrivateIP(res["from"]) or not "rtt" in res or res["rtt"] <= 0.0:
+                    if not "from" in res or not "rtt" in res or res["rtt"] <= 0.0:
                         continue
 
                     if res["from"] != router_ip:
                         router_ip = res["from"]    
+                        if tools.isPrivateIP(router_ip):
+                            continue
+
                         router_asn = self.i2a.ip2asn(router_ip)
                         if router_asn<0:
-                            router_asn = "IX"+str(router_asn*-1)
+                            router_asn = "IX{}"+str(router_asn*-1)
                         else:
                             router_asn = "AS"+str(router_asn)
                     
