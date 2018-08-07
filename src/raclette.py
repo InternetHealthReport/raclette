@@ -13,7 +13,7 @@ import tools
 from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
 
-from tracksaggregator import TracksAggregator
+from tracksaggregator_cy import TracksAggregator
 from delaychangedetector import DelayChangeDetector
 from sqlitesaver import SQLiteSaver
 
