@@ -86,13 +86,15 @@ class Raclette():
 
         for date, results in aggregates.items():
             saver_queue.put("BEGIN TRANSACTION;")
-            [saver_queue.put(
-                    ("diffrtt", 
-                    (date, locations[0], locations[1], agg["median"], 
-                        agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
-                        agg["nb_probes"], agg["entropy"], agg["hop"]))
-                )
-                for locations, agg in results.items()]
+            for locations, agg in results:
+                if agg is not None:
+                    saver_queue.put(
+                        ("diffrtt", 
+                        (date, locations[0], locations[1], agg["median"], 
+                            agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
+                            agg["nb_probes"], agg["entropy"], agg["hop"]))
+                    )
+                    
             saver_queue.put("COMMIT;")
 
 

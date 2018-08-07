@@ -1,4 +1,5 @@
 import logging
+import traceback
 import numpy as np
 # import scipy
 import statsmodels.api as sm
@@ -86,6 +87,42 @@ class TracksAggregator():
         self.track_bins[bin_id].append(track)
         self.bins_last_insert[bin_id] = self.nb_tracks
 
+    def compute_normal_reference(self, param):
+        """
+
+
+        """
+        locations, count = param
+        if count["nb_tracks"]<self.min_tracks:
+            return (locations, None)
+
+        wilson_conf = None
+        nbsamples = len(count["diffrtt"])
+        # TODO: do these 2 steps in parallel
+        count["diffrtt"].sort()
+        entropy =  normalized_entropy(np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)) if len(count["nb_tracks_per_asn"])>1 else 0.0
+
+        # Compute the wilson score
+        if nbsamples in self.wilson_cache:
+            wilson_conf = self.wilson_cache[nbsamples]
+        else:
+            wilson_conf = sm.stats.proportion_confint(
+                    nbsamples/2, 
+                    nbsamples, 
+                    self.significance_level, "wilson")
+            wilson_conf = np.array(wilson_conf)*nbsamples
+            self.wilson_cache[nbsamples] = wilson_conf 
+
+        return (locations, {
+                "conf_low": count["diffrtt"][int(wilson_conf[0])],
+                "conf_high": count["diffrtt"][int(wilson_conf[1])],
+                "median": count["diffrtt"][int(nbsamples/2)],
+                "nb_tracks": count["nb_tracks"],
+                "nb_probes": len(count["unique_probes"]),
+                "entropy": entropy,
+                "hop": np.median(count["hop"])
+                })
+
 
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
@@ -93,61 +130,37 @@ class TracksAggregator():
         tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
         number of diff. RTT samples, number of unique probes."""
 
-        results = {}
-        counters = defaultdict(lambda: {
-            "diffrtt": [], 
-            "unique_probes": set(),
-            "nb_tracks_per_asn": defaultdict(int),
-            "nb_tracks": 0,
-            "hop": []
-            })
+        try : 
+            results = {}
+            counters = defaultdict(lambda: {
+                "diffrtt": [], 
+                "unique_probes": set(),
+                "nb_tracks_per_asn": defaultdict(int),
+                "nb_tracks": 0,
+                "hop": []
+                })
 
-        for track in tracks:
-            nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
-            for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
-                (loc0, rtts0) = locPair[0]
-                (loc1, rtts1) = locPair[1]
-                count = counters[(loc0,loc1)]
-                count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
-                count["nb_tracks_per_asn"][track["from_asn"]] += 1
-                count["unique_probes"].add(track["prb_id"])
-                count["nb_tracks"] += 1
-                count["hop"].append(hop)
+            for track in tracks:
+                nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
+                for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
+                    (loc0, rtts0) = locPair[0]
+                    (loc1, rtts1) = locPair[1]
+                    count = counters[(loc0,loc1)]
+                    count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
+                    count["nb_tracks_per_asn"][track["from_asn"]] += 1
+                    count["unique_probes"].add(track["prb_id"])
+                    count["nb_tracks"] += 1
+                    count["hop"].append(hop)
 
-        # Compute median/wilson scores 
+            # Compute median/wilson scores 
 
-        wilson_conf = None
-        for locations, count in counters.items():
-            if count["nb_tracks"]<self.min_tracks:
-                continue
+        
+            return map(self.compute_normal_reference, counters.items())
 
-            nbsamples = len(count["diffrtt"])
-            # TODO: do these 2 steps in parallel
-            count["diffrtt"].sort()
-            entropy =  normalized_entropy(np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)) if len(count["nb_tracks_per_asn"])>1 else 0.0
+        except Exception as e:
+            print("type error: " + str(e))
+            print(traceback.format_exc())
 
-            # Compute the wilson score
-            if nbsamples in self.wilson_cache:
-                wilson_conf = self.wilson_cache[nbsamples]
-            else:
-                wilson_conf = sm.stats.proportion_confint(
-                        nbsamples/2, 
-                        nbsamples, 
-                        self.significance_level, "wilson")
-                wilson_conf = np.array(wilson_conf)*nbsamples
-                self.wilson_cache[nbsamples] = wilson_conf 
-
-            results[locations] = {
-                    "conf_low": count["diffrtt"][int(wilson_conf[0])],
-                    "conf_high": count["diffrtt"][int(wilson_conf[1])],
-                    "median": count["diffrtt"][int(nbsamples/2)],
-                    "nb_tracks": count["nb_tracks"],
-                    "nb_probes": len(count["unique_probes"]),
-                    "entropy": entropy,
-                    "hop": np.median(count["hop"])
-                    }
-
-        return results
 
 
     def aggregate(self, force_expiration=0):
