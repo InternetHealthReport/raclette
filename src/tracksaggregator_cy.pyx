@@ -1,5 +1,5 @@
 # distutils: language = c++
-import traceback
+# import traceback
 import logging
 import numpy as np
 # import scipy
@@ -7,7 +7,7 @@ import statsmodels.api as sm
 from collections import defaultdict 
 from itertools import combinations, product
 import tools
-# from math import log
+
 from libc.math cimport log
 from libcpp.algorithm cimport sort as cpp_sort
 from cython.parallel import prange
@@ -121,42 +121,37 @@ class TracksAggregator():
                 count["hop"].append(hop)
 
         # Compute median/wilson scores 
-        try:
-            wilson_conf = None
-            for locations, count in counters.items():
-                if count["nb_tracks"]<self.min_tracks:
-                    continue
+        wilson_conf = None
+        for locations, count in counters.items():
+            if count["nb_tracks"]<self.min_tracks:
+                continue
 
-                nbsamples = len(count["diffrtt"])
-                # TODO: do these 2 steps in parallel
-                # count["diffrtt"].sort()
-                
-                inplace_sort(np.asarray(count["diffrtt"]))
-                entropy =  normalized_entropy(np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)) if len(count["nb_tracks_per_asn"])>1 else 0.0
+            int nbsamples = len(count["diffrtt"])
+            # count["diffrtt"].sort()
+            # TODO: do these 2 steps in parallel
+            inplace_sort(np.asarray(count["diffrtt"]))
+            entropy =  normalized_entropy(np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)) if len(count["nb_tracks_per_asn"])>1 else 0.0
 
-                # Compute the wilson score
-                if nbsamples in self.wilson_cache:
-                    wilson_conf = self.wilson_cache[nbsamples]
-                else:
-                    wilson_conf = sm.stats.proportion_confint(
-                            nbsamples/2, 
-                            nbsamples, 
-                            self.significance_level, "wilson")
-                    wilson_conf = np.array(wilson_conf)*nbsamples
-                    self.wilson_cache[nbsamples] = wilson_conf 
+            # Compute the wilson score
+            if nbsamples in self.wilson_cache:
+                wilson_conf = self.wilson_cache[nbsamples]
+            else:
+                wilson_conf = sm.stats.proportion_confint(
+                        nbsamples/2, 
+                        nbsamples, 
+                        self.significance_level, "wilson")
+                wilson_conf = np.array(wilson_conf)*nbsamples
+                self.wilson_cache[nbsamples] = wilson_conf 
 
-                results[locations] = {
-                        "conf_low": count["diffrtt"][int(wilson_conf[0])],
-                        "conf_high": count["diffrtt"][int(wilson_conf[1])],
-                        "median": count["diffrtt"][int(nbsamples/2)],
-                        "nb_tracks": count["nb_tracks"],
-                        "nb_probes": len(count["unique_probes"]),
-                        "entropy": entropy,
-                        "hop": np.median(count["hop"])
-                        }
-        except Exception as e:
-            print("type error: " + str(e))
-            print(traceback.format_exc())
+            results[locations] = {
+                    "conf_low": count["diffrtt"][int(wilson_conf[0])],
+                    "conf_high": count["diffrtt"][int(wilson_conf[1])],
+                    "median": count["diffrtt"][int(nbsamples/2)],
+                    "nb_tracks": count["nb_tracks"],
+                    "nb_probes": len(count["unique_probes"]),
+                    "entropy": entropy,
+                    "hop": np.median(count["hop"])
+                    }
 
         return results
 
