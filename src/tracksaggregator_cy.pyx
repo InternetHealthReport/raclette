@@ -10,46 +10,84 @@ import tools
 
 from libc.math cimport log
 from libcpp.algorithm cimport sort as cpp_sort
+from libcpp.vector cimport vector
+from libcpp.pair cimport pair as cpp_pair
+from cython.operator cimport dereference as deref, preincrement as inc
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
+from libc.stdlib cimport malloc, free
+# from libcpp.list cimport list as cpplist
 from cython.parallel import prange
 cimport cython
 
+# @cython.boundscheck(False) 
+# cpdef double normalized_entropy(long [:] count):
+    # """ Computes normalized entropy of the given distribution. Does not copy 
+    # the input data.  Slightly faster than scipy implementation for small lists.
+    # """
+
+    # cdef int nbelem = count.shape[0]
+    # cdef Py_ssize_t i
+    # cdef double entropyelem
+    # cdef double entropysum = 0
+    # cdef double countsum = 0
+    # cdef double [:] norm_count = np.empty((nbelem,),dtype="double")
+
+    # with nogil:
+        # if nbelem < 2 :
+            # return 0
+
+        # for i in prange(nbelem):
+            # countsum+=count[i]
+
+        # for i in prange(nbelem):
+            # # normalize
+            # norm_count[i] = count[i]/countsum
+
+            # # entropy element-wise
+            # if norm_count[i]<=0:
+                # entropyelem=0
+            # else:
+                # entropyelem = -norm_count[i]*log(norm_count[i])
+
+            # entropysum += entropyelem
+
+    # return entropysum/log(nbelem)
+
+# cdef double normalized_entropy(long *count, int nbelem) nogil:
 @cython.boundscheck(False) 
-cpdef double normalized_entropy(long [:] count):
+cdef double normalized_entropy(long *count, int nbelem) nogil:
     """ Computes normalized entropy of the given distribution. Does not copy 
     the input data.  Slightly faster than scipy implementation for small lists.
     """
 
-    cdef int nbelem = count.shape[0]
     cdef Py_ssize_t i
     cdef double entropyelem
     cdef double entropysum = 0
     cdef double countsum = 0
-    cdef double [:] norm_count = np.empty((nbelem,),dtype="double")
+    cdef double *norm_count = <double*> malloc( nbelem * sizeof(double))
 
-    with nogil:
-        if nbelem == 0:
-            return 0
+    if nbelem < 2:
+        return 0.0
 
-        for i in prange(nbelem):
-            countsum+=count[i]
+    for i in prange(nbelem):
+        countsum+=count[i]
 
-        for i in prange(nbelem):
-            # normalize
-            norm_count[i] = count[i]/countsum
+    # normalize
+    for i in prange(nbelem):
+        norm_count[i] = count[i]/countsum
 
-            # entropy element-wise
-            if norm_count[i]<=0:
-                entropyelem=0
-            else:
-                entropyelem = -norm_count[i]*log(norm_count[i])
+        # entropy element-wise
+        if norm_count[i]<=0:
+            entropyelem=0
+        else:
+            entropyelem = -norm_count[i]*log(norm_count[i])
 
-            entropysum += entropyelem
+        entropysum += entropyelem
+
+    free(norm_count)
 
     return entropysum/log(nbelem)
 
-@cython.boundscheck(False) 
-def inplace_sort(double[:] a):
-    cpp_sort(&a[0], &a[a.shape[0]])
 
 class TracksAggregator():
     """
@@ -93,12 +131,15 @@ class TracksAggregator():
         self.bins_last_insert[bin_id] = self.nb_tracks
 
 
+    @cython.boundscheck(False) 
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
         The returned dictionnary provides for each pair of locations found in the
         tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
         number of diff. RTT samples, number of unique probes."""
 
+        cdef int nbsamples
+        cdef int nblocations
         results = {}
         counters = defaultdict(lambda: {
             "diffrtt": [], 
@@ -121,16 +162,48 @@ class TracksAggregator():
                 count["hop"].append(hop)
 
         # Compute median/wilson scores 
+        for count in counters.values():
+            count["diffrtt"] = np.asarray(count["diffrtt"])
+
+        nblocations = len(counters.values())
+        cdef double * *array_diffrtt =  <double**> PyMem_Malloc( nblocations * 2 * sizeof(double*))
+        cdef long * *array_entropy =  <long **> PyMem_Malloc( nblocations * sizeof(long*))
+        cdef int * array_entropy_size =  <int *> PyMem_Malloc( nblocations * sizeof(int))
+        cdef double *entropy_values =  <double *> PyMem_Malloc( nblocations * sizeof(double))
+        cdef double [:] tmp_array
+        cdef long [:] tmp_ent
+        cdef int loc_idx
+        
+        for loc_idx, x in enumerate(counters.values()):
+            tmp_array = x["diffrtt"]
+            array_diffrtt[loc_idx*2] = &tmp_array[0]
+            array_diffrtt[loc_idx*2+1] = &tmp_array[tmp_array.shape[0]]
+
+            tmp_ent = np.asarray(list(x["nb_tracks_per_asn"].values()))
+            array_entropy[loc_idx] = &tmp_ent[0]
+            array_entropy_size[loc_idx] = tmp_ent.shape[0]
+
+        for loc_idx in prange(nblocations, nogil=True):
+            cpp_sort(array_diffrtt[loc_idx*2], array_diffrtt[loc_idx*2+1])
+            entropy_values[loc_idx] = normalized_entropy(array_entropy[loc_idx], array_entropy_size[loc_idx]) 
+
+        PyMem_Free(array_diffrtt)
+        PyMem_Free(array_entropy)
+        PyMem_Free(array_entropy_size)
+
         wilson_conf = None
-        for locations, count in counters.items():
+        for loc_idx, (locations, count) in enumerate(counters.items()):
             if count["nb_tracks"]<self.min_tracks:
                 continue
+            
+            diff_rtt_values = count["diffrtt"]
+            nbsamples = diff_rtt_values.shape[0]
+            # these 2 steps are precomuped in parallel before this loop
+            # inplace_sort(diff_rtt_values, nbsamples)
+            # tmp_ent = np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)
+            # entropy =  normalized_entropy(tmp_ent)
 
-            int nbsamples = len(count["diffrtt"])
-            # count["diffrtt"].sort()
-            # TODO: do these 2 steps in parallel
-            inplace_sort(np.asarray(count["diffrtt"]))
-            entropy =  normalized_entropy(np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)) if len(count["nb_tracks_per_asn"])>1 else 0.0
+            entropy = entropy_values[loc_idx]
 
             # Compute the wilson score
             if nbsamples in self.wilson_cache:
@@ -152,6 +225,8 @@ class TracksAggregator():
                     "entropy": entropy,
                     "hop": np.median(count["hop"])
                     }
+
+        PyMem_Free(entropy_values)
 
         return results
 
