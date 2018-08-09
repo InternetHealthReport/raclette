@@ -1,8 +1,11 @@
 # distutils: language = c++
+
 # import traceback
+        # except Exception as e:
+            # print("type error: " + str(e))
+            # print(traceback.format_exc())
 import logging
 import numpy as np
-# import scipy
 import statsmodels.api as sm
 from collections import defaultdict 
 from itertools import combinations, product
@@ -15,45 +18,10 @@ from libcpp.pair cimport pair as cpp_pair
 from cython.operator cimport dereference as deref, preincrement as inc
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from libc.stdlib cimport malloc, free
-# from libcpp.list cimport list as cpplist
 from cython.parallel import prange
 cimport cython
 
-# @cython.boundscheck(False) 
-# cpdef double normalized_entropy(long [:] count):
-    # """ Computes normalized entropy of the given distribution. Does not copy 
-    # the input data.  Slightly faster than scipy implementation for small lists.
-    # """
 
-    # cdef int nbelem = count.shape[0]
-    # cdef Py_ssize_t i
-    # cdef double entropyelem
-    # cdef double entropysum = 0
-    # cdef double countsum = 0
-    # cdef double [:] norm_count = np.empty((nbelem,),dtype="double")
-
-    # with nogil:
-        # if nbelem < 2 :
-            # return 0
-
-        # for i in prange(nbelem):
-            # countsum+=count[i]
-
-        # for i in prange(nbelem):
-            # # normalize
-            # norm_count[i] = count[i]/countsum
-
-            # # entropy element-wise
-            # if norm_count[i]<=0:
-                # entropyelem=0
-            # else:
-                # entropyelem = -norm_count[i]*log(norm_count[i])
-
-            # entropysum += entropyelem
-
-    # return entropysum/log(nbelem)
-
-# cdef double normalized_entropy(long *count, int nbelem) nogil:
 @cython.boundscheck(False) 
 cdef double normalized_entropy(long *count, int nbelem) nogil:
     """ Computes normalized entropy of the given distribution. Does not copy 
@@ -108,6 +76,7 @@ class TracksAggregator():
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
         self.wilson_cache = {}
+        self.nb_hops_cache = {}
 
 
     def add_track(self, track):
@@ -140,6 +109,8 @@ class TracksAggregator():
 
         cdef int nbsamples
         cdef int nblocations
+        cdef int i, hopnb
+
         results = {}
         counters = defaultdict(lambda: {
             "diffrtt": [], 
@@ -150,12 +121,18 @@ class TracksAggregator():
             })
 
         for track in tracks:
-            nb_hops = [hopnb for x in range(len(track["rtts"])-1,0,-1) for hopnb in range(1,x+1)]
+            nblocations = len(track["rtts"])
+            try:
+                nb_hops = self.nb_hops_cache[nblocations]
+            except KeyError:
+                nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
+                self.nb_hops_cache[nblocations] = nb_hops
+
             for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
                 (loc0, rtts0) = locPair[0]
                 (loc1, rtts1) = locPair[1]
                 count = counters[(loc0,loc1)]
-                count["diffrtt"] += [ x1-x0 for x0,x1 in product(rtts0, rtts1)]
+                count["diffrtt"] +=   [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
                 count["nb_tracks_per_asn"][track["from_asn"]] += 1
                 count["unique_probes"].add(track["prb_id"])
                 count["nb_tracks"] += 1
