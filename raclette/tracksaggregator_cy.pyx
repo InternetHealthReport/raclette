@@ -133,8 +133,11 @@ class TracksAggregator():
                 (loc_set0, rtts0) = loc_rtts[0]
                 (loc_set1, rtts1) = loc_rtts[1]
                 diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
-                for loc0 in loc_set0: 
-                    for loc1 in loc_set1:
+
+                for loc0, loc1 in product(loc_set0, loc_set1):
+                        if loc0 == loc1:
+                            continue
+
                         count = counters[(loc0,loc1)]
                         count["diffrtt"] += diffrtt 
                         count["nb_tracks_per_asn"][track["from_asn"]] += 1

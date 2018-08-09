@@ -49,7 +49,6 @@ class Raclette():
         self.dump_filter =  config.get("io", "filter")
 
         self.timetrack_converter = config.get("timetrack", "converter")
-        self.add_probe = config.getboolean("timetrack", "add_probe")
 
         self.ip2asn_dir = config.get("lib", "ip2asn_directory")
         self.ip2asn_db = config.get("lib", "ip2asn_db")
@@ -137,9 +136,6 @@ class Raclette():
                 if not track:
                     continue
 
-                if self.add_probe:
-                    track["rtts"] = [(track["prb_id"], [0])] + track["rtts"]
-                
                 tm.add_track(track) 
                 aggregates = tm.aggregate()
                 self.save_aggregates(saver_queue, aggregates)
