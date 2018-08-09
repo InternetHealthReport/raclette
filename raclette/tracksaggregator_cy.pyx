@@ -31,11 +31,11 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
     for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in zip(nb_hops, combinations(track_rtts,2)):
         diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
 
-        for locations in product(loc_set0, loc_set1):
+        for loc0, loc1 in product(loc_set0, loc_set1):
                 if loc0 == loc1:
                     continue
 
-                yield hop, diffrtt, locations
+                yield hop, diffrtt, (loc0, loc1)
 
 
 @cython.boundscheck(False) 
