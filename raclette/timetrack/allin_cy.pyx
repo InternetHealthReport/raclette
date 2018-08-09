@@ -74,7 +74,9 @@ class TimeTrackConverter():
             "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
         if "city" in probe:
-            timetrack["rtts"].append((probe["city"], [0]))
+            timetrack["rtts"].append((["PB"+prb_id, probe["city"]], [0]))
+        else:
+            timetrack["rtts"].append((["PB"+prb_id], [0]))
 
         for hopNb, hop in enumerate(trace["result"]):
 
@@ -108,12 +110,13 @@ class TimeTrackConverter():
                         if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == router_asn_str:
                             idx -= 1
                         else:
-                            timetrack["rtts"].append((router_asn_str,[]))
+                            timetrack["rtts"].append((["Internet", router_asn_str],[]))
                     timetrack["rtts"][idx][1].append(rtt_value)
 
                 if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_info:
 
-                    dest_city = self.probe_info[trace["dst_addr"]]["city"] if trace["dst_addr"] in self.probe_info else "Unk"
-                    timetrack["rtts"].append( (dest_city, timetrack["rtts"][idx][1]) )
+                    dest_city = self.probe_info[trace["dst_addr"]].get("city") 
+                    if dest_city is not None:
+                        timetrack["rtts"].append( ([dest_city], timetrack["rtts"][idx][1]) )
 
         return timetrack

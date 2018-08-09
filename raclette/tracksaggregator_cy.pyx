@@ -110,6 +110,7 @@ class TracksAggregator():
         cdef int nbsamples
         cdef int nblocations
         cdef int i, hopnb
+        cdef double x0, x1
 
         results = {}
         counters = defaultdict(lambda: {
@@ -128,15 +129,18 @@ class TracksAggregator():
                 nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
                 self.nb_hops_cache[nblocations] = nb_hops
 
-            for hop, locPair in zip(nb_hops, combinations(track["rtts"],2)):
-                (loc0, rtts0) = locPair[0]
-                (loc1, rtts1) = locPair[1]
-                count = counters[(loc0,loc1)]
-                count["diffrtt"] +=   [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
-                count["nb_tracks_per_asn"][track["from_asn"]] += 1
-                count["unique_probes"].add(track["prb_id"])
-                count["nb_tracks"] += 1
-                count["hop"].append(hop)
+            for hop, loc_rtts in zip(nb_hops, combinations(track["rtts"],2)):
+                (loc_set0, rtts0) = loc_rtts[0]
+                (loc_set1, rtts1) = loc_rtts[1]
+                diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
+                for loc0 in loc_set0: 
+                    for loc1 in loc_set1:
+                        count = counters[(loc0,loc1)]
+                        count["diffrtt"] += diffrtt 
+                        count["nb_tracks_per_asn"][track["from_asn"]] += 1
+                        count["unique_probes"].add(track["prb_id"])
+                        count["nb_tracks"] += 1
+                        count["hop"].append(hop)
 
         # Compute median/wilson scores 
         for count in counters.values():
