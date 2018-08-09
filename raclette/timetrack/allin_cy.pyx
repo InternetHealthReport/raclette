@@ -35,6 +35,10 @@ class TimeTrackConverter():
                 # lon, lat = probe["geometry"]["coordinates"]
                 # geoloc = rg.search((lat, lon))
                 # probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
+                # if "asn_v4" not in probe:
+                    # probe["asn_v4"] = "AS"+str(self.i2a.ip2asn(probe["address_v4"])) 
+                # if "asn_v6" not in probe:
+                    # probe["asn_v6"] = "AS"+str(self.i2a.ip2asn(probe["address_v6"]))
                 # self.probe_info[probe["address_v4"]] = probe
                 # self.probe_info[probe["address_v6"]] = probe
             # except TypeError:
@@ -58,25 +62,23 @@ class TimeTrackConverter():
         cdef str prb_id = str(trace["prb_id"])
         cdef str prb_ip = trace.get("from","")
         cdef str asn_str = "asn_v"+str(trace["af"])
+        cdef str ip_space_str = "IPv"+str(trace["af"])
 
         try:
             probe = self.probe_info[prb_ip]
         except KeyError:
             probe = self.probe_info.setdefault(prb_ip, {
-                asn_str: self.i2a.ip2asn(prb_ip) if prb_ip else "Unk PB"+prb_id
+                asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id
                 })
-
-        if asn_str not in probe:
-            probe[asn_str] = self.i2a.ip2asn(prb_ip) if prb_ip else "Unk PB"+prb_id
 
         # Initialisation of the timetrack
         timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
             "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
         if "city" in probe:
-            timetrack["rtts"].append(( ("PB"+prb_id, probe["city"]), [0]))
+            timetrack["rtts"].append(( ["PB"+prb_id, probe["city"]], [0]))
         else:
-            timetrack["rtts"].append(( ("PB"+prb_id,), [0]))
+            timetrack["rtts"].append(( ["PB"+prb_id,], [0]))
 
         for hopNb, hop in enumerate(trace["result"]):
 
@@ -95,28 +97,28 @@ class TimeTrackConverter():
                         if isPrivateIP(res_from):
                             continue
 
-                        router_ip = res_from
-                        router_asn = self.i2a.ip2asn(router_ip)
-                        if router_asn<0:
-                            router_asn_str = "IX"+str(router_asn*-1)
+                        asn_tmp = self.i2a.ip2asn(res_from)
+                        if asn_tmp==0:
+                            continue
+                        elif asn_tmp < 0:
+                            router_asn_str = "IX"+str(asn_tmp*-1)
                         else:
-                            router_asn_str = "AS"+str(router_asn)
-                    
-                        # if router_asn == "unknown":
-                            # router_asn = router_ip
+                            router_asn_str = "AS"+str(asn_tmp)
+                        router_ip = res_from
+                        router_asn = asn_tmp
                     
                     idx = -1
                     if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != router_asn_str:
                         if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == router_asn_str:
                             idx -= 1
                         else:
-                            timetrack["rtts"].append(( ("Internet", router_asn_str),[]))
+                            timetrack["rtts"].append(( [ip_space_str, router_asn_str,],[]))
                     timetrack["rtts"][idx][1].append(rtt_value)
 
                 if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_info:
 
                     dest_city = self.probe_info[trace["dst_addr"]].get("city") 
                     if dest_city is not None:
-                        timetrack["rtts"].append( ( (dest_city,), timetrack["rtts"][idx][1]) )
+                        timetrack["rtts"].append( ( [dest_city,], timetrack["rtts"][idx][1]) )
 
         return timetrack

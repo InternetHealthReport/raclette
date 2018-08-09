@@ -19,8 +19,13 @@ class TimeTrackConverter():
                 # lon, lat = probe["geometry"]["coordinates"]
                 # geoloc = rg.search((lat, lon))
                 # probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
+                # if "asn_v4" not in probe:
+                    # probe["asn_v4"] = "AS"+str(self.i2a.ip2asn(probe["address_v4"])) 
+                # if "asn_v6" not in probe:
+                    # probe["asn_v6"] = "AS"+str(self.i2a.ip2asn(probe["address_v6"]))
                 # self.probe_info[probe["address_v4"]] = probe
                 # self.probe_info[probe["address_v6"]] = probe
+
             # except TypeError:
                 # continue
         logging.info("Ready to convert traceroutes!")
@@ -45,9 +50,6 @@ class TimeTrackConverter():
             probe = self.probe_info.setdefault(prb_ip, {
                 asn_str: self.i2a.ip2asn(prb_ip) if prb_ip else "Unk PB"+prb_id
                 })
-
-        if asn_str not in probe:
-            probe[asn_str] = self.i2a.ip2asn(prb_ip) if prb_ip else "Unk PB"+prb_id
 
         # Initialisation of the timetrack
         timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 

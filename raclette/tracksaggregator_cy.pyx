@@ -1,5 +1,6 @@
 # distutils: language = c++
 
+
 # import traceback
         # except Exception as e:
             # print("type error: " + str(e))
@@ -20,6 +21,21 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from libc.stdlib cimport malloc, free
 from cython.parallel import prange
 cimport cython
+
+@cython.boundscheck(False) 
+@cython.nonecheck(False) 
+def enumerate_loc_diffrtt(nb_hops, track_rtts):
+    cdef double x1,x0
+    cdef str loc0, loc1
+
+    for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in zip(nb_hops, combinations(track_rtts,2)):
+        diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
+
+        for locations in product(loc_set0, loc_set1):
+                if loc0 == loc1:
+                    continue
+
+                yield hop, diffrtt, locations
 
 
 @cython.boundscheck(False) 
@@ -82,21 +98,25 @@ class TracksAggregator():
     def add_track(self, track):
         """Add a new track to the history."""
 
+        cdef double win_size = self.window_size
+        cdef long ts = track["timestamp"]
+
         self.nb_tracks += 1
         if not track :
             self.nb_empty_tracks += 1
             return
 
-        bin_id = int(track["timestamp"]/self.window_size)
+        bin_id = int(ts/win_size)
         if self.bins_last_insert[bin_id] is None:
             self.nb_ignored_tracks += 1
             return
 
         # index track based on its timestamp
-        if bin_id not in self.track_bins:
-            self.track_bins[bin_id] = []
+        try:
+            self.track_bins[bin_id].append(track)
+        except KeyError:
+            self.track_bins[bin_id] = [track]
 
-        self.track_bins[bin_id].append(track)
         self.bins_last_insert[bin_id] = self.nb_tracks
 
 
@@ -111,6 +131,7 @@ class TracksAggregator():
         cdef int nblocations
         cdef int i, hopnb
         cdef double x0, x1
+        cdef str loc0, loc1
 
         results = {}
         counters = defaultdict(lambda: {
@@ -120,31 +141,34 @@ class TracksAggregator():
             "nb_tracks": 0,
             "hop": []
             })
+        nb_hops_cache = self.nb_hops_cache
 
+        logging.info("Computing differential RTTs")
         for track in tracks:
             nblocations = len(track["rtts"])
+            from_asn = track["from_asn"]
+            prb_id = track["prb_id"]
+
             try:
-                nb_hops = self.nb_hops_cache[nblocations]
+                nb_hops = nb_hops_cache[nblocations]
             except KeyError:
                 nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
                 self.nb_hops_cache[nblocations] = nb_hops
 
-            for hop, loc_rtts in zip(nb_hops, combinations(track["rtts"],2)):
-                (loc_set0, rtts0) = loc_rtts[0]
-                (loc_set1, rtts1) = loc_rtts[1]
-                diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
+            # for hop, ((loc_set0,rtts0),(loc_set1,rtts1)) in zip(nb_hops, combinations(track["rtts"],2)):
+                # diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
 
-                for loc0, loc1 in product(loc_set0, loc_set1):
-                        if loc0 == loc1:
-                            continue
+                # for locations in product(loc_set0, loc_set1):
 
-                        count = counters[(loc0,loc1)]
-                        count["diffrtt"] += diffrtt 
-                        count["nb_tracks_per_asn"][track["from_asn"]] += 1
-                        count["unique_probes"].add(track["prb_id"])
-                        count["nb_tracks"] += 1
-                        count["hop"].append(hop)
+            for hop, diffrtt, locations in enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
+                    count = counters[locations]
+                    count["diffrtt"] += diffrtt 
+                    count["nb_tracks_per_asn"][from_asn] += 1
+                    count["unique_probes"].add(prb_id)
+                    count["nb_tracks"] += 1
+                    count["hop"].append(hop)
 
+        logging.info("Computing statistics")
         # Compute median/wilson scores 
         for count in counters.values():
             count["diffrtt"] = np.asarray(count["diffrtt"])
@@ -176,8 +200,10 @@ class TracksAggregator():
         PyMem_Free(array_entropy_size)
 
         wilson_conf = None
+        wilson_cache = self.wilson_cache
+        min_tracks = self.min_tracks
         for loc_idx, (locations, count) in enumerate(counters.items()):
-            if count["nb_tracks"]<self.min_tracks:
+            if count["nb_tracks"]<min_tracks:
                 continue
             
             diff_rtt_values = count["diffrtt"]
@@ -190,15 +216,15 @@ class TracksAggregator():
             entropy = entropy_values[loc_idx]
 
             # Compute the wilson score
-            if nbsamples in self.wilson_cache:
-                wilson_conf = self.wilson_cache[nbsamples]
+            if nbsamples in wilson_cache:
+                wilson_conf = wilson_cache[nbsamples]
             else:
                 wilson_conf = sm.stats.proportion_confint(
                         nbsamples/2, 
                         nbsamples, 
                         self.significance_level, "wilson")
                 wilson_conf = np.array(wilson_conf)*nbsamples
-                self.wilson_cache[nbsamples] = wilson_conf 
+                wilson_cache[nbsamples] = wilson_conf 
 
             results[locations] = {
                     "conf_low": count["diffrtt"][int(wilson_conf[0])],
