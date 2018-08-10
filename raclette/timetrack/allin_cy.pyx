@@ -14,7 +14,6 @@ priv_20 = re.compile("^192\.168\.\d{1,3}.\d{1,3}$")
 priv_16 = re.compile("^172.(1[6-9]|2[0-9]|3[0-1]).[0-9]{1,3}.[0-9]{1,3}$")
 priv_lo = re.compile("^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
-#TODO private network for ipv6
 cdef bool isPrivateIP(str ip):
 
     if priv_24.match(ip) or priv_20.match(ip) or priv_16.match(ip) or priv_lo.match(ip):
@@ -31,21 +30,21 @@ class TimeTrackConverter():
         self.probe_info = {}
         logging.info("Loading probes info...")
         filters = {"tags": "system-anchor"}
-        # probes = ProbeRequest(**filters)
-        # for probe in probes:
-            # try:
-                # lon, lat = probe["geometry"]["coordinates"]
-                # geoloc = rg.search((lat, lon))
-                # probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
-                # if "asn_v4" not in probe:
-                    # probe["asn_v4"] = "AS"+str(self.i2a.ip2asn(probe["address_v4"])) 
-                # if "asn_v6" not in probe:
-                    # probe["asn_v6"] = "AS"+str(self.i2a.ip2asn(probe["address_v6"]))
-                # probe["location"] = "|".join(["PB"+probe[id],probe["city"]])
-                # self.probe_info[probe["address_v4"]] = probe
-                # self.probe_info[probe["address_v6"]] = probe
-            # except TypeError:
-                # continue
+        probes = ProbeRequest(**filters)
+        for probe in probes:
+            try:
+                lon, lat = probe["geometry"]["coordinates"]
+                geoloc = rg.search((lat, lon))
+                probe["city"] = "CT{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
+                if "asn_v4" not in probe and "address_v4" in probe:
+                    probe["asn_v4"] = "AS"+str(self.i2a.ip2asn(probe["address_v4"])) 
+                if "asn_v6" not in probe and "address_v6" in probe:
+                    probe["asn_v6"] = "AS"+str(self.i2a.ip2asn(probe["address_v6"]))
+                probe["location"] = "|".join(["PB"+probe["id"],probe["city"]])
+                self.probe_info[probe["address_v4"]] = probe
+                self.probe_info[probe["address_v6"]] = probe
+            except TypeError:
+                continue
         logging.info("Ready to convert traceroutes!")
 
 

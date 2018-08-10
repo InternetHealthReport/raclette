@@ -158,11 +158,6 @@ class TracksAggregator():
                     nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
                     self.nb_hops_cache[nblocations] = nb_hops
 
-                # for hop, ((loc_set0,rtts0),(loc_set1,rtts1)) in zip(nb_hops, combinations(track["rtts"],2)):
-                    # diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
-
-                    # for locations in product(loc_set0, loc_set1):
-
                 for hop, diffrtt, locations in enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
                         count = counters[locations]
                         count["diffrtt"] += diffrtt 

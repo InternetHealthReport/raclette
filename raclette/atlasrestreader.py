@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ripe.atlas.cousteau import AtlasResultsRequest
 
 # Semaphore used to control the number of buffered results from the pool
-semaphore = threading.Semaphore(16) 
+semaphore = threading.Semaphore(32) 
 
 def get_results(param, retry=3):
     traceroute2timetrack, kwargs = param
