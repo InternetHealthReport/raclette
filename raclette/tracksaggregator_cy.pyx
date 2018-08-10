@@ -1,7 +1,7 @@
 # distutils: language = c++
 
 
-# import traceback
+import traceback
         # except Exception as e:
             # print("type error: " + str(e))
             # print(traceback.format_exc())
@@ -25,17 +25,19 @@ cimport cython
 @cython.boundscheck(False) 
 @cython.nonecheck(False) 
 def enumerate_loc_diffrtt(nb_hops, track_rtts):
+    """Enumerate over all locations and compute diffrtt"""
+
     cdef double x1,x0
+    # cdef tuple loc_set0, loc_set1
+    cdef list rtts0, rtts1
     cdef str loc0, loc1
 
     for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in zip(nb_hops, combinations(track_rtts,2)):
-        diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
+        # double for loops are faster than itertools.product
+        # diffrtt =  [ x1-x0 for x0, x1 in product(rtts0,rtts1)] 
+        diffrtt =  [ x1-x0 for x0 in rtts0 for x1 in rtts1] 
 
-        for loc0, loc1 in product(loc_set0, loc_set1):
-                if loc0 == loc1:
-                    continue
-
-                yield hop, diffrtt, (loc0, loc1)
+        [(yield (hop, diffrtt, (loc0, loc1))) for loc0 in loc_set0.split("|") for loc1 in loc_set1.split("|") if loc0!=loc1]
 
 
 @cython.boundscheck(False) 
@@ -142,31 +144,36 @@ class TracksAggregator():
             "hop": []
             })
         nb_hops_cache = self.nb_hops_cache
-
         logging.info("Computing differential RTTs")
-        for track in tracks:
-            nblocations = len(track["rtts"])
-            from_asn = track["from_asn"]
-            prb_id = track["prb_id"]
 
-            try:
-                nb_hops = nb_hops_cache[nblocations]
-            except KeyError:
-                nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
-                self.nb_hops_cache[nblocations] = nb_hops
+        try:
+            for track in tracks:
+                nblocations = len(track["rtts"])
+                from_asn = track["from_asn"]
+                prb_id = track["prb_id"]
 
-            # for hop, ((loc_set0,rtts0),(loc_set1,rtts1)) in zip(nb_hops, combinations(track["rtts"],2)):
-                # diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
+                try:
+                    nb_hops = nb_hops_cache[nblocations]
+                except KeyError:
+                    nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
+                    self.nb_hops_cache[nblocations] = nb_hops
 
-                # for locations in product(loc_set0, loc_set1):
+                # for hop, ((loc_set0,rtts0),(loc_set1,rtts1)) in zip(nb_hops, combinations(track["rtts"],2)):
+                    # diffrtt =  [ x1-x0 for x0,x1 in product(rtts0, rtts1)] 
 
-            for hop, diffrtt, locations in enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
-                    count = counters[locations]
-                    count["diffrtt"] += diffrtt 
-                    count["nb_tracks_per_asn"][from_asn] += 1
-                    count["unique_probes"].add(prb_id)
-                    count["nb_tracks"] += 1
-                    count["hop"].append(hop)
+                    # for locations in product(loc_set0, loc_set1):
+
+                for hop, diffrtt, locations in enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
+                        count = counters[locations]
+                        count["diffrtt"] += diffrtt 
+                        count["nb_tracks_per_asn"][from_asn] += 1
+                        count["unique_probes"].add(prb_id)
+                        count["nb_tracks"] += 1
+                        count["hop"].append(hop)
+
+        except Exception as e:
+            print("type error: " + str(e))
+            print(traceback.format_exc())
 
         logging.info("Computing statistics")
         # Compute median/wilson scores 
