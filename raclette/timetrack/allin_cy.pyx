@@ -1,4 +1,6 @@
 #cython: boundscheck=False, nonecheck=False
+
+import traceback
 import logging
 import tools
 from ripe.atlas.cousteau import ProbeRequest
@@ -54,69 +56,83 @@ class TimeTrackConverter():
         if "prb_id" not in trace or trace is None or "error" in trace["result"][0] or "err" in trace["result"][0]["result"]:
             return None
 
-        cdef int probe_asn, asn_tmp
+        cdef long probe_asn, asn_tmp
         cdef double rtt_value
         cdef str location_str
-        cdef str router_ip, res_from
+        cdef str router_ip =""
+        cdef str res_from
         cdef dict timetrack
         cdef str src_ip = trace["from"]
         cdef str prb_id = str(trace["prb_id"])
         cdef str prb_ip = trace.get("from","")
         cdef str asn_str = "asn_v"+str(trace["af"])
-        cdef str ip_space_str = "IPv"+str(trace["af"])
+        cdef str ip_space_str = "v"+str(trace["af"])
 
-        try:
-            probe = self.probe_info[prb_ip]
-        except KeyError:
-            probe = self.probe_info.setdefault(prb_ip, {
-                asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id,
-                "location": "PB"+prb_id
-                })
+        try: 
+            try:
+                # Initialisation of the timetrack
+                probe = self.probe_info[prb_ip]
+                timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
-        # Initialisation of the timetrack
-        timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
-            "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
+            except KeyError:
+                if prb_ip not in self.probe_info:
+                    probe = self.probe_info.setdefault(prb_ip, {
+                        asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id,
+                        "location": "PB"+prb_id
+                        })
+                
+                elif asn_str not in probe:
+                    probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id
 
-        timetrack["rtts"].append( [probe["location"], [0]] )
+                timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
-        for hopNb, hop in enumerate(trace["result"]):
 
-            if "result" in hop :
+            timetrack["rtts"].append( [probe["location"], [0]] )
 
-                for res in hop["result"]:
-                    if not "from" in res or not "rtt" in res or res["rtt"] <= 0.0:
-                        continue
+            for hopNb, hop in enumerate(trace["result"]):
 
-                    res_from = res["from"] 
-                    rtt_value = res["rtt"]
+                if "result" in hop :
 
-                    if res_from != router_ip:
-                        if isPrivateIP(res_from):
+                    for res in hop["result"]:
+                        if not "from" in res or not "rtt" in res or res["rtt"] <= 0.0:
                             continue
 
-                        asn_tmp = self.i2a.ip2asn(res_from)
-                        if asn_tmp==0:
-                            continue
-                        elif asn_tmp < 0:
-                            location_str = "".join(["IX", str(asn_tmp*-1), "|", ip_space_str])
-                        else:
-                            location_str = "".join(["AS", str(asn_tmp), "|", ip_space_str])
-                        router_ip = res_from
-                        
-                        # Add city if needed
-                        if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_info:
+                        res_from = res["from"] 
+                        rtt_value = res["rtt"]
 
-                            dest_city = self.probe_info[trace["dst_addr"]].get("city") 
-                            if dest_city is not None:
-                                location_str+= "|"+dest_city
+                        if res_from != router_ip:
+                            if isPrivateIP(res_from):
+                                continue
 
-                    idx = -1
-                    if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != location_str:
-                        if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == location_str:
-                            idx -= 1
-                        else:
-                            timetrack["rtts"].append( [location_str,[]] )
-                    timetrack["rtts"][idx][1].append(rtt_value)
+                            asn_tmp = self.i2a.ip2asn(res_from)
+                            if asn_tmp==0:
+                                continue
+                            elif asn_tmp < 0:
+                                location_str = "".join(["IX", str(asn_tmp*-1), ip_space_str, "|IP", ip_space_str])
+                            else:
+                                location_str = "".join(["AS", str(asn_tmp), ip_space_str, "|IP", ip_space_str])
+                            router_ip = res_from
+                            
+                            # Add city if needed
+                            if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_info:
 
+                                dest_city = self.probe_info[trace["dst_addr"]].get("city") 
+                                if dest_city is not None:
+                                    location_str= "|".join([location_str,dest_city])
+
+                        idx = -1
+                        # location comparisons are much faster with strings (than list of strings)!
+                        if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != location_str:
+                            if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == location_str:
+                                idx -= 1
+                            else:
+                                timetrack["rtts"].append( [location_str,[]] )
+                        timetrack["rtts"][idx][1].append(rtt_value)
+
+        except Exception as e:
+            print("type error: " + str(e))
+            print(traceback.format_exc())
 
         return timetrack
