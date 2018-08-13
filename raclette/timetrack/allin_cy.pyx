@@ -33,11 +33,12 @@ class TimeTrackConverter():
         probes = ProbeRequest(**filters)
         for probe in probes:
             try:
+                prb_id = str(probe["id"])
                 lon, lat = probe["geometry"]["coordinates"]
                 geoloc = rg.search((lat, lon))
                 probe["city"] = "CT{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
-                probe["location"] = "|".join(["PB"+probe["id"],probe["city"]])
-                self.probe_info[probe["id"]] = probe
+                probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
+                self.probe_info[prb_id] = probe
             except TypeError:
                 continue
         logging.info("Ready to convert traceroutes!")
@@ -70,10 +71,11 @@ class TimeTrackConverter():
                     "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
             except KeyError:
-                if prb_ip not in self.probe_info:
+                if prb_id not in self.probe_info:
                     probe = self.probe_info.setdefault(prb_id, {
                         asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id,
                         "location": "PB"+prb_id })
+                    self.probe_info[prb_id] = probe
                 
                 elif asn_str not in probe:
                     probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id

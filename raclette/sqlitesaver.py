@@ -41,6 +41,7 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON diffrtt (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON diffrtt (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON diffrtt (endpoint)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_expid ON diffrtt (expid)")
 
         # Table storing anomalous delay changes
         self.cursor.execute("CREATE TABLE IF NOT EXISTS delayanomaly (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")

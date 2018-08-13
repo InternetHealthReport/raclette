@@ -8,6 +8,7 @@ import configparser
 import argparse
 from multiprocessing import Process, Pool, JoinableQueue, Pipe
 import importlib
+import traceback
 
 import tools
 from dumpReader import DumpReader
@@ -100,61 +101,65 @@ class Raclette():
         Main program connecting all modules.
         """
 
-        # Initialisation
-        saver_queue = JoinableQueue(1000000)
-        detector_pipe = Pipe(False)
-
-        # These are run in a separate process
-        detector_delay = DelayChangeDetector(detector_pipe[0], saver_queue)
-        saver_sqlite = SQLiteSaver(self.saver_filename, saver_queue)
-
-        saver_sqlite.start()
-        detector_delay.start()
-
-        sys.path.append(self.ip2asn_dir)
-        import ip2asn
-        i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
-
         try:
-            timetrac_module = importlib.import_module("timetrack."+self.timetrack_converter)
-            timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
-        except ImportError:
-            logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
-            return
+            # Initialisation
+            saver_queue = JoinableQueue(1000000)
+            detector_pipe = Pipe(False)
 
-        tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
+            # These are run in a separate process
+            detector_delay = DelayChangeDetector(detector_pipe[0], saver_queue)
+            saver_sqlite = SQLiteSaver(self.saver_filename, saver_queue)
 
-        saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
+            saver_sqlite.start()
+            detector_delay.start()
 
-        tr_reader = AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
-                self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) 
-        # tr_reader  = DumpReader(dump_name, dump_filter)
+            sys.path.append(self.ip2asn_dir)
+            import ip2asn
+            i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
 
-        # # Main Loop:
-        with tr_reader:
-            for track in tr_reader.read():
-                if not track:
-                    continue
+            try:
+                timetrac_module = importlib.import_module("timetrack."+self.timetrack_converter)
+                timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
+            except ImportError:
+                logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
+                return
 
-                tm.add_track(track) 
-                aggregates = tm.aggregate()
-                self.save_aggregates(saver_queue, aggregates)
+            tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
 
-        logging.info("Finished to read data {}".format(datetime.datetime.today()))
+            saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
-        # Try to aggregate remaining track bins
-        aggregates = tm.aggregate(force_expiration=0.5)
-        self.save_aggregates(saver_queue, aggregates)
+            tr_reader = AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
+                    self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) 
+            # tr_reader  = DumpReader(dump_name, dump_filter)
 
-        logging.info("Number of ignored tracks {}".format(tm.nb_ignored_tracks))
+            # # Main Loop:
+            with tr_reader:
+                for track in tr_reader.read():
+                    if not track:
+                        continue
 
-        # closing
-        saver_queue.join()
-        saver_sqlite.terminate()
-        detector_delay.terminate()
+                    tm.add_track(track) 
+                    aggregates = tm.aggregate()
+                    self.save_aggregates(saver_queue, aggregates)
 
-        logging.info("Ended on {}".format(datetime.datetime.today()))
+            logging.info("Finished to read data {}".format(datetime.datetime.today()))
 
+            # Try to aggregate remaining track bins
+            aggregates = tm.aggregate(force_expiration=0.5)
+            self.save_aggregates(saver_queue, aggregates)
+
+            logging.info("Number of ignored tracks {}".format(tm.nb_ignored_tracks))
+
+            # closing
+            saver_queue.join()
+            saver_sqlite.terminate()
+            detector_delay.terminate()
+
+            logging.info("Ended on {}".format(datetime.datetime.today()))
+        
+        except Exception as e:
+            print("type error: " + str(e))
+            print(traceback.format_exc())
 
 if __name__ == "__main__":
     ra = Raclette()

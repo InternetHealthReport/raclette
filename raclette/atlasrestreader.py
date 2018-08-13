@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ripe.atlas.cousteau import AtlasResultsRequest
 
 # Semaphore used to control the number of buffered results from the pool
-semaphore = threading.Semaphore(32) 
+semaphore = threading.Semaphore(3) 
 
 def get_results(param, retry=3):
     traceroute2timetrack, kwargs = param
@@ -16,18 +16,20 @@ def get_results(param, retry=3):
         semaphore.acquire()
 
     # logging.info("Requesting results for {}".format(kwargs))
-    is_success, results = AtlasResultsRequest(**kwargs).create()
+    success_list, results_list = AtlasResultsRequest(**kwargs).create()
     # logging.info("Server replied {}".format(kwargs))
 
-    if is_success:
-        return map(traceroute2timetrack,results)
-    else:
-        logging.warning("Atlas request failed for {}".format(kwargs))
-        if retry > 0:
-            return get_results(param, retry-1)
+    for is_success, results in zip(success_list, results_list):
+        if is_success:
+            yield map(traceroute2timetrack,results)
         else:
             logging.error("All retries failed for {}".format(kwargs))
-            return
+            # logging.warning("Atlas request failed for {}".format(kwargs))
+            # if retry > 0:
+                # return get_results(param, retry-1)
+            # else:
+                # logging.error("All retries failed for {}".format(kwargs))
+                # return
 
 
 class AtlasRestReader():
@@ -49,20 +51,20 @@ class AtlasRestReader():
     def __enter__(self):    
         self.params = []
         logging.warn("creating the pool")
-        self.pool = ThreadPoolExecutor(max_workers=8) 
+        self.pool = ThreadPoolExecutor(max_workers=4) 
 
         window_start = self.start
         while window_start+datetime.timedelta(seconds=self.chunk_size) <= self.end:
-            for msm_id in self.msm_ids:
-                kwargs = {
-                    "msm_id": msm_id,
-                    "start": window_start,
-                    "stop": window_start+datetime.timedelta(seconds=self.chunk_size),
-                    "probe_ids": self.probe_ids,
-                        }
-                self.params.append(
-                        [ self.timetrack_converter.traceroute2timetrack,
-                        kwargs])
+            # for msm_id in self.msm_ids:
+            kwargs = {
+                "msm_id": self.msm_ids,
+                "start": window_start,
+                "stop": window_start+datetime.timedelta(seconds=self.chunk_size),
+                "probe_ids": self.probe_ids,
+                    }
+            self.params.append(
+                    [ self.timetrack_converter.traceroute2timetrack,
+                    kwargs])
             window_start += datetime.timedelta(seconds=self.chunk_size)
         logging.warn("pool ready")
 
@@ -74,11 +76,12 @@ class AtlasRestReader():
 
     def read(self):
         # m = map(get_results, self.params)
-        m = self.pool.map(get_results, self.params)
+        msm_results = self.pool.map(get_results, self.params)
 
-        for tracks in m: 
-            yield from tracks
-            
+        for res in msm_results:
+            for tracks in res: 
+                yield from tracks
+                
             semaphore.release()
 
 
