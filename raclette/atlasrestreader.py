@@ -5,6 +5,7 @@ import itertools
 import threading 
 from concurrent.futures import ThreadPoolExecutor
 from ripe.atlas.cousteau import AtlasResultsRequest
+from progress.bar import Bar
 
 # Semaphore used to control the number of buffered results from the pool
 semaphore = threading.Semaphore(3) 
@@ -47,6 +48,7 @@ class AtlasRestReader():
         self.chunk_size = chunk_size
         self.params = []
         self.timetrack_converter = timetrack_converter 
+        self.bar = None
 
     def __enter__(self):    
         self.params = []
@@ -75,6 +77,7 @@ class AtlasRestReader():
 
 
     def read(self):
+        self.bar = Bar("Processing", max=len(self.params), suffix='%(percent)d%%')
         # m = map(get_results, self.params)
         msm_results = self.pool.map(get_results, self.params)
 
@@ -83,11 +86,13 @@ class AtlasRestReader():
                 yield from tracks
                 
             semaphore.release()
+            self.bar.next()
 
 
     def close(self): 
         if self.pool is not None: 
             self.pool.shutdown()
+        self.bar.finish()
         return False
 
 

@@ -122,6 +122,7 @@ class Raclette():
                 timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
             except ImportError:
                 logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
+                traceback.print_exc(file=sys.stdout)
                 return
 
             tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)

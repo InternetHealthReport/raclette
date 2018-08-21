@@ -6,3 +6,4 @@ ripe.atlas.cousteau
 apsw
 reverse-geocoder
 cython
+progress
