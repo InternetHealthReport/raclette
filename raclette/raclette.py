@@ -1,5 +1,7 @@
 import sys
 import os
+from gevent import monkey
+monkey.patch_all()
 import logging
 import datetime
 from collections import defaultdict

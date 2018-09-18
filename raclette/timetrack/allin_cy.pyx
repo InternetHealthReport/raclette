@@ -1,10 +1,7 @@
 #cython: boundscheck=False, nonecheck=False
-
 import traceback
 import logging
 import tools
-from ripe.atlas.cousteau import ProbeRequest
-import reverse_geocoder as rg
 from cpython cimport bool
 import re
 
@@ -28,20 +25,19 @@ class TimeTrackConverter():
 
         self.i2a = i2a
         self.probe_info = {}
-        logging.info("Loading probes info...")
-        filters = {"tags": "system-anchor"}
-        probes = ProbeRequest(**filters)
-        for probe in probes:
+        self.probe_addresses = {}
+        for probe in tools.get_probes_info():
             try:
                 prb_id = str(probe["id"])
-                lon, lat = probe["geometry"]["coordinates"]
-                geoloc = rg.search((lat, lon))
-                probe["city"] = "CT{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
                 probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
                 self.probe_info[prb_id] = probe
+                # will get city names only for these addresses
+                self.probe_addresses[probe["address_v4"]]= prb_id
+                self.probe_addresses[probe["address_v6"]]= prb_id
             except TypeError:
                 continue
-        logging.info("Ready to convert traceroutes!")
+        logging.info("Ready to convert traceroutes! (loaded {} probes info)"
+                .format(len(self.probe_info)))
 
 
     def traceroute2timetrack(self, dict trace):
@@ -111,9 +107,9 @@ class TimeTrackConverter():
                             router_ip = res_from
                             
                             # Add city if needed
-                            if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_info:
+                            if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_addresses:
 
-                                dest_city = self.probe_info[trace["dst_addr"]].get("city") 
+                                dest_city = self.probe_info[self.probe_addresses[trace["dst_addr"]]].get("city") 
                                 if dest_city is not None:
                                     location_str= "|".join([location_str,dest_city])
 

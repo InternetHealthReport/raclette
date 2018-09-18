@@ -35,6 +35,15 @@ def eccdf(a, ax=None, **kwargs):
 
     return {k:v for k,v in zip(sorted, 1-yvals)}
 
+def location2str(location):
+    """Prettier textual representation of the given location"""
+    
+    if location.startswith("CT"):
+        return location[2:]
+    elif location.startswith("PB"):
+        return "Probe"+location[2:]
+    else:
+        return location
 
 class Plotter(object):
 
@@ -152,8 +161,8 @@ class Plotter(object):
         """
 
         all_df = []
-        endpoint_label = endpoint if endpoint_label is None else endpoint_label
-        startpoint_label = startpoint if startpoint_label is None else startpoint_label
+        endpoint_label = location2str(endpoint) if endpoint_label is None else endpoint_label
+        startpoint_label = location2str(startpoint) if startpoint_label is None else startpoint_label
 
         for conn in self.conn:
             all_df.append(pd.read_sql_query( 
@@ -185,16 +194,19 @@ class Plotter(object):
                 fig = plt.figure(figsize=(6,3))
             # Ignore locations with a small number of samples
             if group:
-                x_label = "{} to {}".format(locations[0], locations[1]) if label is None else label
+                x_label = "{} to {}".format(
+                        location2str(locations[0]), 
+                        location2str(locations[1])) if label is None else label
                 plt.plot(data[metric], label=x_label)
             else:
                 plt.plot(data[metric], label=label)
                 plt.title("{} to {} ({} probes)".format(
-                    locations[0], locations[1], 
+                    location2str(locations[0]), 
+                    location2str(locations[1]), 
                     nb_probes_per_geo[locations[0]]))
         
             plt.gca().xaxis_date(tz)
-            plt.ylabel("Differential RTT (ms)")
+            plt.ylabel("RTT (ms)")
             # plt.ylabel("RTT (ms)")
             plt.xlabel("Time ({})".format(tz))
             if label is not None or (group and len(diffrtt_grp)>1):
