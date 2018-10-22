@@ -1,14 +1,38 @@
 import json
 import datetime
+import calendar
 import logging
 import itertools 
 import threading 
+from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
-from ripe.atlas.cousteau import AtlasResultsRequest
+# from ripe.atlas.cousteau import AtlasResultsRequest
 from progress.bar import Bar
 
 # Semaphore used to control the number of buffered results from the pool
 semaphore = threading.Semaphore(4) 
+
+def cousteau_on_steroid(params):
+    url = "https://atlas.ripe.net/api/v2/measurements/{0}/results"
+    req_param = {
+            "start": int(calendar.timegm(params["start"].timetuple())),
+            "stop": int(calendar.timegm(params["stop"].timetuple())),
+            "probe_ids": params["probe_ids"]
+            }
+
+
+    queries = []
+    responses = []
+
+    session = FuturesSession(max_workers=4)
+    for msm in params["msm_id"]:
+        queries.append( session.get(url=url, params=req_param) )
+
+    for query in queries:
+        responses.append(query.result())
+
+    return [(resp.ok, resp.json()) for resp in responses]
+
 
 def get_results(param, retry=3):
     traceroute2timetrack, kwargs = param
@@ -17,10 +41,11 @@ def get_results(param, retry=3):
         semaphore.acquire()
 
     # logging.info("Requesting results for {}".format(kwargs))
-    success_list, results_list = AtlasResultsRequest(**kwargs).create()
+    # success_list, results_list = AtlasResultsRequest(**kwargs).create()
+    results_list = cousteau_on_steroid(kwargs)
     # logging.info("Server replied {}".format(kwargs))
 
-    for is_success, results in zip(success_list, results_list):
+    for is_success, results in results_list:
         if is_success:
             yield map(traceroute2timetrack,results)
         else:

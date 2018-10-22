@@ -48,8 +48,11 @@ class Raclette():
         self.atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if x]
         self.atlas_chunk_size = int(config.get("io","chunk_size"))
 
-        self.dump_name =  config.get("io", "dump_file")
-        self.dump_filter =  config.get("io", "filter")
+        try:
+            self.dump_name =  config.get("io", "dump_file")
+            self.dump_filter =  config.get("io", "filter")
+        except configparser.NoOptionError:
+            pass
 
         self.timetrack_converter = config.get("timetrack", "converter")
 

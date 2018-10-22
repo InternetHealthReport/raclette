@@ -2,8 +2,10 @@ scipy
 statsmodels
 numpy
 matplotlib
-ripe.atlas.cousteau
+requests_futures
 apsw
 reverse-geocoder
 cython
 progress
+gevent
+py-radix

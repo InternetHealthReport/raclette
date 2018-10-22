@@ -10,7 +10,7 @@ class ip2asn:
         self.asname = {}
         self.rtree = pickle.load(open(db, "rb"))
 
-        if ixp is not None:
+        if ixp :
             with open(ixp) as fi:
                 for line in fi:
                     if not line.startswith("#"):
