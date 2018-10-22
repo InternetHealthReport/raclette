@@ -17,21 +17,20 @@ def cousteau_on_steroid(params):
     req_param = {
             "start": int(calendar.timegm(params["start"].timetuple())),
             "stop": int(calendar.timegm(params["stop"].timetuple())),
-            "probe_ids": params["probe_ids"]
             }
-
+    
+    if params["probe_ids"]:
+        req_param["probe_ids"] = params["probe_ids"]
 
     queries = []
-    responses = []
 
-    session = FuturesSession(max_workers=4)
+    session = FuturesSession(max_workers=8)
     for msm in params["msm_id"]:
-        queries.append( session.get(url=url, params=req_param) )
+        queries.append( session.get(url=url.format(msm), params=req_param) )
 
     for query in queries:
-        responses.append(query.result())
-
-    return [(resp.ok, resp.json()) for resp in responses]
+        resp = query.result()
+        yield (resp.ok, resp.json())
 
 
 def get_results(param, retry=3):

@@ -7,5 +7,4 @@ apsw
 reverse-geocoder
 cython
 progress
-gevent
 py-radix
