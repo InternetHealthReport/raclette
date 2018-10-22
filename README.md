@@ -79,11 +79,11 @@ tail -F results/ASC_start/log_2018-09-02T12:00.log
 All results are stored in a sqlite database. The filename is the one you gave in the configuration file (io/results).
 Raclette comes with a script to easily plot graphs from that database. For example, to plot delays between Melbourne and Singapore use the following commands:
 ```
-python raclette/plotter.py results/2018-09-02T12:00/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU'
+python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU'
 ```
 If you have executed the raclette.py several times with the same results file. The results for each instances are stored separately. To get results from the third execution (cf. the field expid in the database):
 ```
-python raclette/plotter.py results/2018-09-02T12:00/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU' 3
+python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU' 3
 ```
 
 You can also directly query the database with a sqlite client. The table you want to look at is diffrtt:
