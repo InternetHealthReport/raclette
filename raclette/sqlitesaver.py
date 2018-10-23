@@ -70,6 +70,8 @@ class SQLiteSaver(multiprocessing.Process):
 
         elif t == "diffrtt":
             ts, startpoint, endpoint, median, high, low, nb_tracks, nb_probes, entropy, hop = data
+            if startpoint.startswith("CT"):
+                print(startpoint)
 
             if self.prevts != ts:
                 self.prevts = ts

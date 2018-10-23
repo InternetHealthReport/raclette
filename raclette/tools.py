@@ -36,17 +36,9 @@ def get_probes_info():
     if os.path.exists("cache/probe_info.json"):
         # Get probe information from cache
         cache = json.load(open("cache/probe_info.json","r"))
-        bar = Bar(
-                "Loading probe information from cache", 
-                max=len(cache["probes"]), 
-                suffix='%(percent)d%%'
-                )
+        print("Loading probe information from cache")
 
-        for probe in cache["probes"]:
-            bar.next()
-            yield probe
-
-        bar.finish()
+        return cache["probes"]
 
     else:
         # Fetch probe information from RIPE API
@@ -97,5 +89,4 @@ def get_probes_info():
             }, fi, indent=4)
         fi.close()
 
-        for probe in probes:
-            yield probe
+        return probes
