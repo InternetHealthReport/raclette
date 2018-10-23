@@ -38,6 +38,7 @@ def eccdf(a, ax=None, **kwargs):
 def location2str(location):
     """Prettier textual representation of the given location"""
     
+    location = location.replace("%","")
     if location.startswith("CT"):
         return location[2:]
     elif location.startswith("PB"):
