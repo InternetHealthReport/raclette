@@ -82,7 +82,7 @@ def get_probes_info():
                         (lon, lat) = probe["geometry"]["coordinates"]
                         probe["city"] = "CT{}, {}".format(geoloc[(lat,lon)]["name"], geoloc[(lat,lon)]["cc"])
                         probes.append(probe)
-                        yield probe
+                        # yield probe.copy()
                     except TypeError:
                         logging.debug("Error with probe: {}".format(probe))
 
@@ -97,4 +97,5 @@ def get_probes_info():
             }, fi, indent=4)
         fi.close()
 
-
+        for probe in probes:
+            yield probe
