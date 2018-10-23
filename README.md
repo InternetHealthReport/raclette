@@ -79,11 +79,15 @@ tail -F results/ASC_start/log_2018-09-02T12:00.log
 All results are stored in a sqlite database. The filename is the one you gave in the configuration file (io/results).
 Raclette comes with a script to easily plot graphs from that database. For example, to plot delays between Melbourne and Singapore use the following commands:
 ```
-python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU'
+python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%'
 ```
+The following graph will be save in the fig/ directory:
+![SMW3 cut and ASC start](http://ihr.iijlab.net/static/ihr/Melbourne_Singapore_median_expid1_diffrtt_time.png)
+The graph shows delay changes on Sep.3rd due to a submarine cable cut (SMW3) between Singapore and Australia and the start of a new submarine cable (ASC) on Sep.5th.
+
 If you have executed raclette.py several times with the same results file. The results for each instance are stored with a different experiment ID (cf. the field expid in the database). To plot with results from the third execution:
 ```
-python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU' 3
+python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%' 3
 ```
 
 You can also directly query the database with a sqlite client. The table you want to look at is diffrtt:
