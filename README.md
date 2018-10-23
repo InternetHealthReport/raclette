@@ -85,6 +85,7 @@ The following graph will be save in the fig/ directory:
 ![SMW3 cut and ASC start](http://ihr.iijlab.net/static/ihr/Melbourne_Singapore_median_expid1_diffrtt_time.png)
 The graph shows delay changes on Sep.3rd due to a submarine cable cut (SMW3) between Singapore and Australia and the start of a new submarine cable (ASC) on Sep.5th.
 
+### Miscellaneous
 If you have executed raclette.py several times with the same results file. The results for each instance are stored with a different experiment ID (cf. the field expid in the database). To plot with results from the third execution:
 ```
 python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%' 3
