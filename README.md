@@ -81,7 +81,7 @@ Raclette comes with a script to easily plot graphs from that database. For examp
 ```
 python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU'
 ```
-If you have executed the raclette.py several times with the same results file. The results for each instances are stored separately. To get results from the third execution (cf. the field expid in the database):
+If you have executed raclette.py several times with the same results file. The results for each instance are stored with a different experiment ID (cf. the field expid in the database). To plot with results from the third execution:
 ```
 python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  'CTSingapore, SG' 'CTMelbourne, AU' 3
 ```
