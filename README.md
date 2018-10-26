@@ -2,6 +2,10 @@
 
 Raclette simplifies the analysis of numerous traceroute results by merging results and adding semantics. For example, one can use raclette to read millions traceroute results from RIPE Atlas API and then query raclette for delays between “Amsterdam, NL” and “AS15169” (Google) to obtain the median Round Trip Times (RTTs) between all vantage points in Amsterdam and all Google IP addresses found in traceroutes.
 
+## Requirements
+- Python 3+
+- pip (to install required python libraries)
+
 ## Install
 Get the latest source files:
 ```
