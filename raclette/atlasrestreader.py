@@ -12,6 +12,10 @@ from progress.bar import Bar
 # Semaphore used to control the number of buffered results from the pool
 semaphore = threading.Semaphore(4) 
 
+def __worker_task(sess, resp):
+    """Process json in background"""
+    resp.data = resp.json()
+
 def cousteau_on_steroid(params):
     url = "https://atlas.ripe.net/api/v2/measurements/{0}/results"
     req_param = {
@@ -26,11 +30,13 @@ def cousteau_on_steroid(params):
 
     session = FuturesSession(max_workers=8)
     for msm in params["msm_id"]:
-        queries.append( session.get(url=url.format(msm), params=req_param) )
+        queries.append( session.get(url=url.format(msm), params=req_param
+                        background_callback=__worker_task
+            ) )
 
     for query in queries:
         resp = query.result()
-        yield (resp.ok, resp.json())
+        yield (resp.ok, resp.data)
 
 
 def get_results(param, retry=3):
