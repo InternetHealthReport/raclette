@@ -8,15 +8,37 @@ from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
 # from ripe.atlas.cousteau import AtlasResultsRequest
 from progress.bar import Bar
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # Semaphore used to control the number of buffered results from the pool
 semaphore = threading.Semaphore(4) 
 
-def __worker_task(sess, resp):
+def requests_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    status_forcelist=(500, 502, 504),
+    session=None,
+    max_workers=4,
+):
+    session = session or FuturesSession(max_workers=max_workers)
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+def worker_task(sess, resp):
     """Process json in background"""
     resp.data = resp.json()
 
-def cousteau_on_steroid(params):
+def cousteau_on_steroid(params, retry=3):
     url = "https://atlas.ripe.net/api/v2/measurements/{0}/results"
     req_param = {
             "start": int(calendar.timegm(params["start"].timetuple())),
@@ -28,10 +50,10 @@ def cousteau_on_steroid(params):
 
     queries = []
 
-    session = FuturesSession(max_workers=8)
+    session = requests_retry_session()
     for msm in params["msm_id"]:
-        queries.append( session.get(url=url.format(msm), params=req_param
-                        background_callback=__worker_task
+        queries.append( session.get(url=url.format(msm), params=req_param,
+                        background_callback=worker_task
             ) )
 
     for query in queries:
