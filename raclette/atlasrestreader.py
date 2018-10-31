@@ -5,11 +5,11 @@ import logging
 import itertools 
 import threading 
 from requests_futures.sessions import FuturesSession
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
 # from ripe.atlas.cousteau import AtlasResultsRequest
 from progress.bar import Bar
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 
 # Semaphore used to control the number of buffered results from the pool
 semaphore = threading.Semaphore(4) 
