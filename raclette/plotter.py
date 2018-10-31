@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.dates as mdates
 import pandas as pd
-from ripe.atlas.cousteau import Probe
+
 try:
     import reverse_geocoder as rg
 except ImportError:
