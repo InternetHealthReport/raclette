@@ -1,4 +1,5 @@
 scipy
+configparser
 statsmodels
 numpy
 matplotlib
@@ -8,4 +9,4 @@ reverse-geocoder
 cython
 progress
 py-radix
-configparser
+pandas
