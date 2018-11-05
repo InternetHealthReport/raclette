@@ -106,7 +106,7 @@ class Raclette():
 
         try:
             # Initialisation
-            saver_queue = JoinableQueue(1000000)
+            saver_queue = JoinableQueue()
             detector_pipe = Pipe(False)
 
             # These are run in a separate process
