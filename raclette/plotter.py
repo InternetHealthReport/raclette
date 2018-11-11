@@ -211,8 +211,11 @@ class Plotter(object):
                     nb_probes_per_geo[locations[0]]))
         
             plt.gca().xaxis_date(tz)
-            plt.ylabel("RTT (ms)")
-            # plt.ylabel("RTT (ms)")
+            if metric == "median":
+                plt.ylabel("diff. RTT (ms)")
+            else:
+                plt.ylabel(metric)
+
             plt.xlabel("Time ({})".format(tz))
             if label is not None or (group and len(diffrtt_grp)>1):
                 plt.legend(loc='best')
