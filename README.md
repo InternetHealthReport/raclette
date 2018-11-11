@@ -15,8 +15,8 @@ git clone git@github.com:InternetHealthReport/raclette.git
 Install dependencies and install raclette:
 ```
 cd raclette
-pip install -r requirements.txt 
-python setup.py build_ext
+sudo pip install -r requirements.txt 
+python setup.py build_ext --inplace
 sudo python setup.py install
 ```
 
