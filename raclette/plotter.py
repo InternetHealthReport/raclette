@@ -167,7 +167,7 @@ class Plotter(object):
 
         for conn in self.conn:
             all_df.append(pd.read_sql_query( 
-                ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks, nbprobes " 
+                ("SELECT * " 
                 "FROM diffrtt "
                 "WHERE expid=? and startpoint like ? and endpoint like ? "
                 "ORDER BY ts"), 
@@ -330,6 +330,9 @@ if __name__ == "__main__":
     pl = Plotter(db) 
 
     pl.metric_over_time(startpoint, endpoint)
+    pl.metric_over_time(startpoint, endpoint, "hop")
+    pl.metric_over_time(startpoint, endpoint, "nbtracks")
+    pl.metric_over_time(startpoint, endpoint, "nbprobes")
     # pl.profile_endpoint(startpoint)
     # pl.profile_endpoint(endpoint)
 
