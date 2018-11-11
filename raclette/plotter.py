@@ -199,8 +199,12 @@ class Plotter(object):
                         location2str(locations[0]), 
                         location2str(locations[1])) if label is None else label
                 plt.plot(data[metric], label=x_label)
+                # plt.plot(data["confhigh"], label=x_label)
+                # plt.plot(data["conflow"], label=x_label)
             else:
                 plt.plot(data[metric], label=label)
+                # plt.plot(data["confhigh"], label=label)
+                # plt.plot(data["conflow"], label=label)
                 plt.title("{} to {} ({} probes)".format(
                     location2str(locations[0]), 
                     location2str(locations[1]), 

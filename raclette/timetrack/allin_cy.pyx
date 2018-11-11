@@ -98,9 +98,7 @@ class TimeTrackConverter():
                                 continue
 
                             asn_tmp = self.i2a.ip2asn(res_from)
-                            if asn_tmp==0:
-                                continue
-                            elif asn_tmp < 0:
+                            if asn_tmp < 0:
                                 location_str = "".join(["IX", str(asn_tmp*-1), ip_space_str, "|IP", ip_space_str])
                             else:
                                 location_str = "".join(["AS", str(asn_tmp), ip_space_str, "|IP", ip_space_str])
@@ -115,7 +113,7 @@ class TimeTrackConverter():
 
                         idx = -1
                         # location comparisons are much faster with strings (than list of strings)!
-                        if len(timetrack["rtts"])==0 or timetrack["rtts"][idx][0] != location_str:
+                        if timetrack["rtts"][idx][0] != location_str:
                             if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == location_str:
                                 idx -= 1
                             else:
@@ -127,3 +125,4 @@ class TimeTrackConverter():
             print(traceback.format_exc())
 
         return timetrack
+
