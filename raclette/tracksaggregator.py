@@ -111,6 +111,7 @@ class TracksAggregator():
                     "conf_low": count["diffrtt"][int(wilson_conf[0])],
                     "conf_high": count["diffrtt"][int(wilson_conf[1])],
                     "median": count["diffrtt"][int(len(count["diffrtt"])/2)],
+                    "min": count["diffrtt"][0],
                     "nb_tracks": count["nb_tracks"],
                     "nb_probes": len(count["unique_probes"]),
                     "entropy": entropy,

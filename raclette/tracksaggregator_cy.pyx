@@ -1,10 +1,9 @@
 # distutils: language = c++
 
-
 import traceback
-        # except Exception as e:
-            # print("type error: " + str(e))
-            # print(traceback.format_exc())
+# except Exception as e:
+    # print("type error: " + str(e))
+    # print(traceback.format_exc())
 import logging
 import numpy as np
 import statsmodels.api as sm
@@ -232,6 +231,7 @@ class TracksAggregator():
                     "conf_low": count["diffrtt"][int(wilson_conf[0])],
                     "conf_high": count["diffrtt"][int(wilson_conf[1])],
                     "median": count["diffrtt"][int(nbsamples/2)],
+                    "min": count["diffrtt"][0],
                     "nb_tracks": count["nb_tracks"],
                     "nb_probes": len(count["unique_probes"]),
                     "entropy": entropy,

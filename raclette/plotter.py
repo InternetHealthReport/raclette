@@ -183,7 +183,9 @@ class Plotter(object):
         diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
         nbtracks_avg = diffrtt["nbtracks"].mean()
-        logging.warn("{} average samples".format(nbtracks_avg))
+        nbhops = diffrtt["hop"].mean()
+        logging.warning("{} average samples".format(nbtracks_avg))
+        logging.warning("The two selected locations are on average {} hops away".format(nbhops))
 
         if group:
             fig = plt.figure(figsize=(6,3))
@@ -333,9 +335,9 @@ if __name__ == "__main__":
     pl = Plotter(db) 
 
     pl.metric_over_time(startpoint, endpoint)
-    pl.metric_over_time(startpoint, endpoint, "hop")
     pl.metric_over_time(startpoint, endpoint, "nbtracks")
     pl.metric_over_time(startpoint, endpoint, "nbprobes")
+    pl.metric_over_time(startpoint, endpoint, "entropy")
     # pl.profile_endpoint(startpoint)
     # pl.profile_endpoint(endpoint)
 
