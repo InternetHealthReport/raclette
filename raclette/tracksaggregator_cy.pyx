@@ -31,12 +31,15 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
     cdef list rtts0, rtts1
     cdef str loc0, loc1
 
-    for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in zip(nb_hops, combinations(track_rtts,2)):
+    for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in \
+            zip(nb_hops, combinations(track_rtts,2)):
         # double for loops are faster than itertools.product
         # diffrtt =  [ x1-x0 for x0, x1 in product(rtts0,rtts1)] 
         diffrtt =  [ x1-x0 for x0 in rtts0 for x1 in rtts1] 
 
-        [(yield (hop, diffrtt, (loc0, loc1))) for loc0 in loc_set0.split("|") for loc1 in loc_set1.split("|") if loc0!=loc1]
+        [(yield (hop, diffrtt, (loc0, loc1))) 
+                for loc0 in loc_set0.split("|") 
+                for loc1 in loc_set1.split("|") if loc0!=loc1]
 
 
 @cython.boundscheck(False) 
@@ -124,9 +127,9 @@ class TracksAggregator():
     @cython.boundscheck(False) 
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
-        The returned dictionnary provides for each pair of locations found in the
-        tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
-        number of diff. RTT samples, number of unique probes."""
+        The returned dictionnary provides for each pair of locations found in 
+        the tracks, the differential median RTT, wilson scores, entropy of 
+        probes ASN, number of diff. RTT samples, number of unique probes."""
 
         cdef int nbsamples
         cdef int nblocations
@@ -140,7 +143,8 @@ class TracksAggregator():
             "unique_probes": set(),
             "nb_tracks_per_asn": defaultdict(int),
             "nb_tracks": 0,
-            "hop": []
+            "hop": [],
+            "nb_real_rtts": 0,
             })
         nb_hops_cache = self.nb_hops_cache
         logging.info("Computing differential RTTs")
@@ -154,16 +158,25 @@ class TracksAggregator():
                 try:
                     nb_hops = nb_hops_cache[nblocations]
                 except KeyError:
-                    nb_hops = [hopnb for i in range(nblocations-1,0,-1) for hopnb in range(1,i+1)]
+                    nb_hops = [hopnb for i in range(nblocations-1,0,-1) 
+                            for hopnb in range(1,i+1)]
                     self.nb_hops_cache[nblocations] = nb_hops
 
-                for hop, diffrtt, locations in enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
+                for hop, diffrtt, locations in \
+                    enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
                         count = counters[locations]
                         count["diffrtt"] += diffrtt 
                         count["nb_tracks_per_asn"][from_asn] += 1
                         count["unique_probes"].add(prb_id)
                         count["nb_tracks"] += 1
                         count["hop"].append(hop)
+                        # If the locations correspond to the source locations
+                        # or the probe ASN then we count this as a real RTT
+                        # sample
+                        if locations[0] in track["rtts"][0][0] \
+                            or locations[0] == track["from_asn"]:
+                                count["nb_real_rtts"] += 1
+
 
         except Exception as e:
             print("type error: " + str(e))
@@ -175,10 +188,14 @@ class TracksAggregator():
             count["diffrtt"] = np.asarray(count["diffrtt"])
 
         nblocations = len(counters.values())
-        cdef double * *array_diffrtt =  <double**> PyMem_Malloc( nblocations * 2 * sizeof(double*))
-        cdef long * *array_entropy =  <long **> PyMem_Malloc( nblocations * sizeof(long*))
-        cdef int * array_entropy_size =  <int *> PyMem_Malloc( nblocations * sizeof(int))
-        cdef double *entropy_values =  <double *> PyMem_Malloc( nblocations * sizeof(double))
+        cdef double * *array_diffrtt =  <double**> PyMem_Malloc( 
+                nblocations * 2 * sizeof(double*))
+        cdef long * *array_entropy =  <long **> PyMem_Malloc( 
+                nblocations * sizeof(long*))
+        cdef int * array_entropy_size =  <int *> PyMem_Malloc( 
+                nblocations * sizeof(int))
+        cdef double *entropy_values =  <double *> PyMem_Malloc( 
+                nblocations * sizeof(double))
         cdef double [:] tmp_array
         cdef long [:] tmp_ent
         cdef int loc_idx
@@ -194,7 +211,8 @@ class TracksAggregator():
 
         for loc_idx in prange(nblocations, nogil=True):
             cpp_sort(array_diffrtt[loc_idx*2], array_diffrtt[loc_idx*2+1])
-            entropy_values[loc_idx] = normalized_entropy(array_entropy[loc_idx], array_entropy_size[loc_idx]) 
+            entropy_values[loc_idx] = normalized_entropy(
+                    array_entropy[loc_idx], array_entropy_size[loc_idx]) 
 
         PyMem_Free(array_diffrtt)
         PyMem_Free(array_entropy)
@@ -235,7 +253,8 @@ class TracksAggregator():
                     "nb_tracks": count["nb_tracks"],
                     "nb_probes": len(count["unique_probes"]),
                     "entropy": entropy,
-                    "hop": np.median(count["hop"])
+                    "hop": np.median(count["hop"]),
+                    "nb_real_rtts": count["nb_real_rtts"]
                     }
 
         PyMem_Free(entropy_values)
@@ -245,8 +264,8 @@ class TracksAggregator():
 
     def aggregate(self, force_expiration=0):
         """Find expired track bins, that is bins that are not affected by the 
-        last n track insertions (n=self.expiration). And compute median differential
-        RTTs, number of sample, etc.. for expired bins. """
+        last n track insertions (n=self.expiration). And compute median 
+        differential RTTs, number of sample, etc.. for expired bins. """
 
         results = {} 
 
@@ -257,7 +276,8 @@ class TracksAggregator():
 
             for date, tracks in self.track_bins.items():
 
-                if self.bins_last_insert[date]+self.expiration < self.nb_tracks or force_expiration:
+                if self.bins_last_insert[date]+self.expiration < self.nb_tracks \
+                        or force_expiration:
                     if force_expiration and not len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
                         continue
                     else:

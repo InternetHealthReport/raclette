@@ -37,7 +37,12 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment (id integer primary key, date text, cmd text, args text)")
 
         # Table storing aggregated differential RTTs 
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt (ts integer, startpoint text, endpoint text, median real, minimum real, confhigh real, conflow real, nbtracks integer, nbprobes integer, entropy real, hop integer, expid integer, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt \
+                (ts integer, startpoint text, endpoint text, median real, \
+                minimum real, confhigh real, conflow real, nbtracks integer, \
+                nbprobes integer, entropy real, hop integer, nbrealrtts integer,\
+                expid integer, \
+                foreign key(expid) references experiment(id))")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON diffrtt (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON diffrtt (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON diffrtt (endpoint)")
@@ -69,17 +74,29 @@ class SQLiteSaver(multiprocessing.Process):
             return
 
         elif t == "diffrtt":
-            ts, startpoint, endpoint, median, minimum, high, low, nb_tracks, nb_probes, entropy, hop = data
+            ts, startpoint, endpoint, median, minimum, high, low, nb_tracks, nb_probes, entropy, hop, nbrealrtts = data
 
             if self.prevts != ts:
                 self.prevts = ts
                 logging.info("start recording diff. RTTs (ts={})".format(ts))
             
-            self.cursor.execute("INSERT INTO diffrtt(ts, startpoint, endpoint, median, confhigh, conflow, minimum, nbtracks, nbprobes, entropy, hop, expid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (ts, startpoint, endpoint, median, minimum, high, low, nb_tracks, nb_probes, entropy, hop, self.expid) )
+            self.cursor.execute("INSERT INTO diffrtt \
+                    (ts, startpoint, endpoint, median, confhigh, conflow, \
+                    minimum, nbtracks, nbprobes, entropy, hop, nbrealrtts, \
+                    expid) \
+                    VALUES \
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                    (ts, startpoint, endpoint, median, minimum, high, low, 
+                        nb_tracks, nb_probes, entropy, hop, nbrealrtts, 
+                        self.expid) )
                     # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )
 
         elif t == "delayanomaly":
-            self.cursor.execute("INSERT INTO delayanomaly(ts, startpoint, endpoint, median, expid) VALUES (?, ?, ?, ?, ?)", data+[self.expid])
+            self.cursor.execute("INSERT INTO delayanomaly \
+                    (ts, startpoint, endpoint, median, expid) \
+                    VALUES (?, ?, ?, ?, ?)", data+[self.expid])
 
         elif t == "delayreference":
-            self.cursor.execute("INSERT INTO delayreference(ts, startpoint, endpoint, median, confhigh, conflow, expid) VALUES (?, ?, ?, ?, ?, ?, ?)", data+[self.expid] )
+            self.cursor.execute("INSERT INTO delayreference \
+            (ts, startpoint, endpoint, median, confhigh, conflow, expid) \
+            VALUES (?, ?, ?, ?, ?, ?, ?)", data+[self.expid] )

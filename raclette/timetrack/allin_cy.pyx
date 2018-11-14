@@ -63,21 +63,29 @@ class TimeTrackConverter():
             try:
                 # Initialisation of the timetrack
                 probe = self.probe_info[prb_id]
-                timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
-                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
+                timetrack = {"prb_id": "PB"+prb_id, 
+                        "from_asn": "".join(["AS", str(probe[asn_str]),
+                            ip_space_str]),
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                    "rtts":[]}
 
             except KeyError:
                 if prb_id not in self.probe_info:
                     probe = self.probe_info.setdefault(prb_id, {
-                        asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id,
+                        asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                                if prb_ip else "Unk PB"+prb_id,
                         "location": "PB"+prb_id })
                     self.probe_info[prb_id] = probe
                 
                 elif asn_str not in probe:
-                    probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) if prb_ip else "Unk PB"+prb_id
+                    probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                            if prb_ip else "Unk PB"+prb_id
 
-                timetrack = {"prb_id": "PB"+prb_id, "from_asn": probe[asn_str], 
-                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
+                timetrack = {"prb_id": "PB"+prb_id, 
+                        "from_asn": "".join(["AS", str(probe[asn_str]),
+                            ip_space_str]),
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                    "rtts":[]}
 
 
             timetrack["rtts"].append( [probe["location"], [0]] )
@@ -87,7 +95,8 @@ class TimeTrackConverter():
                 if "result" in hop :
 
                     for res in hop["result"]:
-                        if not "from" in res or not "rtt" in res or res["rtt"] <= 0.0:
+                        if not "from" in res or not "rtt" in res \
+                                or res["rtt"] <= 0.0:
                             continue
 
                         res_from = res["from"] 
@@ -99,22 +108,28 @@ class TimeTrackConverter():
 
                             asn_tmp = self.i2a.ip2asn(res_from)
                             if asn_tmp < 0:
-                                location_str = "".join(["IX", str(asn_tmp*-1), ip_space_str, "|IP", ip_space_str])
+                                location_str = "".join(["IX", str(asn_tmp*-1), 
+                                    ip_space_str, "|IP", ip_space_str])
                             else:
-                                location_str = "".join(["AS", str(asn_tmp), ip_space_str, "|IP", ip_space_str])
+                                location_str = "".join(["AS", str(asn_tmp), 
+                                    ip_space_str, "|IP", ip_space_str])
                             router_ip = res_from
                             
                             # Add city if needed
-                            if router_ip == trace["dst_addr"] and trace["dst_addr"] in self.probe_addresses:
+                            if router_ip == trace["dst_addr"] \
+                                    and trace["dst_addr"] in self.probe_addresses:
 
-                                dest_city = self.probe_info[self.probe_addresses[trace["dst_addr"]]].get("city") 
+                                dest_city = self.probe_info[
+                                        self.probe_addresses[trace["dst_addr"]]].get("city") 
                                 if dest_city is not None:
-                                    location_str= "|".join([location_str,dest_city])
+                                    location_str= "|".join([
+                                        location_str,dest_city])
 
                         idx = -1
                         # location comparisons are much faster with strings (than list of strings)!
                         if timetrack["rtts"][idx][0] != location_str:
-                            if len(timetrack["rtts"])>1 and timetrack["rtts"][idx-1][0] == location_str:
+                            if len(timetrack["rtts"])>1 \
+                                    and timetrack["rtts"][idx-1][0] == location_str:
                                 idx -= 1
                             else:
                                 timetrack["rtts"].append( [location_str,[]] )
