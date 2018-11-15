@@ -1,5 +1,7 @@
 # raclette: Human-friendly monitoring of Internet delays
 
+ [![Waffle.io - Columns and their card count](https://badge.waffle.io/InternetHealthReport/raclette.svg?columns=all)](https://waffle.io/InternetHealthReport/raclette) 
+
 Raclette simplifies the analysis of numerous traceroute results by merging results and adding semantics. For example, one can use raclette to read millions traceroute results from RIPE Atlas API and then query raclette for delays between “Amsterdam, NL” and “AS15169” (Google) to obtain the median Round Trip Times (RTTs) between all vantage points in Amsterdam and all Google IP addresses found in traceroutes.
 
 ## Requirements
@@ -15,8 +17,8 @@ git clone git@github.com:InternetHealthReport/raclette.git
 Install dependencies and install raclette:
 ```
 cd raclette
-pip install -r requirements.txt 
-python setup.py build_ext
+sudo pip install -r requirements.txt 
+python setup.py build_ext --inplace
 sudo python setup.py install
 ```
 

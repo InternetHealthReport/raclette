@@ -9,3 +9,4 @@ reverse-geocoder
 cython
 progress
 py-radix
+pandas

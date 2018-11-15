@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.dates as mdates
 import pandas as pd
-from ripe.atlas.cousteau import Probe
+
 try:
     import reverse_geocoder as rg
 except ImportError:
@@ -167,7 +167,7 @@ class Plotter(object):
 
         for conn in self.conn:
             all_df.append(pd.read_sql_query( 
-                ("SELECT ts, startpoint, endpoint, median, confhigh, conflow, nbtracks, nbprobes " 
+                ("SELECT * " 
                 "FROM diffrtt "
                 "WHERE expid=? and startpoint like ? and endpoint like ? "
                 "ORDER BY ts"), 
@@ -183,7 +183,9 @@ class Plotter(object):
         diffrtt_grp = diffrtt.groupby(["startpoint","endpoint"])
 
         nbtracks_avg = diffrtt["nbtracks"].mean()
-        logging.warn("{} average samples".format(nbtracks_avg))
+        nbhops = diffrtt["hop"].mean()
+        logging.warning("{} average samples".format(nbtracks_avg))
+        logging.warning("The two selected locations are on average {} hops away".format(nbhops))
 
         if group:
             fig = plt.figure(figsize=(6,3))
@@ -199,16 +201,23 @@ class Plotter(object):
                         location2str(locations[0]), 
                         location2str(locations[1])) if label is None else label
                 plt.plot(data[metric], label=x_label)
+                # plt.plot(data["confhigh"], label=x_label)
+                # plt.plot(data["conflow"], label=x_label)
             else:
                 plt.plot(data[metric], label=label)
+                # plt.plot(data["confhigh"], label=label)
+                # plt.plot(data["conflow"], label=label)
                 plt.title("{} to {} ({} probes)".format(
                     location2str(locations[0]), 
                     location2str(locations[1]), 
                     nb_probes_per_geo[locations[0]]))
         
             plt.gca().xaxis_date(tz)
-            plt.ylabel("RTT (ms)")
-            # plt.ylabel("RTT (ms)")
+            if metric == "median":
+                plt.ylabel("diff. RTT (ms)")
+            else:
+                plt.ylabel(metric)
+
             plt.xlabel("Time ({})".format(tz))
             if label is not None or (group and len(diffrtt_grp)>1):
                 plt.legend(loc='best')
@@ -329,6 +338,9 @@ if __name__ == "__main__":
     pl = Plotter(db) 
 
     pl.metric_over_time(startpoint, endpoint, expid=expid)
+    pl.metric_over_time(startpoint, endpoint, "nbtracks", expid=expid)
+    pl.metric_over_time(startpoint, endpoint, "nbprobes", expid=expid)
+    pl.metric_over_time(startpoint, endpoint, "entropy", expid=expid)
     # pl.profile_endpoint(startpoint)
     # pl.profile_endpoint(endpoint)
 

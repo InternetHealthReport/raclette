@@ -92,8 +92,9 @@ class Raclette():
             [saver_queue.put(
                     ("diffrtt", 
                     (date, locations[0], locations[1], agg["median"], 
-                        agg["conf_high"], agg["conf_low"], agg["nb_tracks"],
-                        agg["nb_probes"], agg["entropy"], agg["hop"]))
+                        agg["conf_high"], agg["conf_low"], agg["min"],
+                        agg["nb_tracks"], agg["nb_probes"], agg["entropy"], 
+                        agg["hop"], agg["nb_real_rtts"]))
                 )
                 for locations, agg in results.items()]
             saver_queue.put("COMMIT;")
@@ -106,7 +107,7 @@ class Raclette():
 
         try:
             # Initialisation
-            saver_queue = JoinableQueue(1000000)
+            saver_queue = JoinableQueue()
             detector_pipe = Pipe(False)
 
             # These are run in a separate process
