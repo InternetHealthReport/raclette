@@ -322,10 +322,13 @@ if __name__ == "__main__":
     db = sys.argv[1]
     startpoint=sys.argv[2]
     endpoint=sys.argv[3]
+    expid=1
+    if len(sys.argv)>4:
+        expid = int(sys.argv[4])
 
     pl = Plotter(db) 
 
-    pl.metric_over_time(startpoint, endpoint)
+    pl.metric_over_time(startpoint, endpoint, expid=expid)
     # pl.profile_endpoint(startpoint)
     # pl.profile_endpoint(endpoint)
 
