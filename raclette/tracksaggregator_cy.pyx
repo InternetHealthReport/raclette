@@ -79,8 +79,8 @@ cdef double normalized_entropy(long *count, int nbelem) nogil:
 
 class TracksAggregator():
     """
-    Sort tracks based on their timestamp and compute median differential RTT and
-    wilson score for each time bin.
+    Sort tracks based on their timestamp and compute minimum and median 
+    differential RTT for each time bin.
     """
 
     def __init__(self, window_size, expiration, significance_level, min_tracks):
@@ -95,7 +95,6 @@ class TracksAggregator():
         self.expiration = expiration
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
-        self.wilson_cache = {}
         self.nb_hops_cache = {}
 
 
@@ -128,7 +127,7 @@ class TracksAggregator():
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
         The returned dictionnary provides for each pair of locations found in 
-        the tracks, the differential median RTT, wilson scores, entropy of 
+        the tracks, the differential median RTT, minimum, entropy of 
         probes ASN, number of diff. RTT samples, number of unique probes."""
 
         cdef int nbsamples
@@ -183,7 +182,7 @@ class TracksAggregator():
             print(traceback.format_exc())
 
         logging.info("Computing statistics")
-        # Compute median/wilson scores 
+        # Compute median
         for count in counters.values():
             count["diffrtt"] = np.asarray(count["diffrtt"])
 
@@ -218,8 +217,6 @@ class TracksAggregator():
         PyMem_Free(array_entropy)
         PyMem_Free(array_entropy_size)
 
-        wilson_conf = None
-        wilson_cache = self.wilson_cache
         min_tracks = self.min_tracks
         for loc_idx, (locations, count) in enumerate(counters.items()):
             if count["nb_tracks"]<min_tracks:
@@ -234,20 +231,7 @@ class TracksAggregator():
 
             entropy = entropy_values[loc_idx]
 
-            # Compute the wilson score
-            if nbsamples in wilson_cache:
-                wilson_conf = wilson_cache[nbsamples]
-            else:
-                wilson_conf = sm.stats.proportion_confint(
-                        nbsamples/2, 
-                        nbsamples, 
-                        self.significance_level, "wilson")
-                wilson_conf = np.array(wilson_conf)*nbsamples
-                wilson_cache[nbsamples] = wilson_conf 
-
             results[locations] = {
-                    "conf_low": count["diffrtt"][int(wilson_conf[0])],
-                    "conf_high": count["diffrtt"][int(wilson_conf[1])],
                     "median": count["diffrtt"][int(nbsamples/2)],
                     "min": count["diffrtt"][0],
                     "nb_tracks": count["nb_tracks"],

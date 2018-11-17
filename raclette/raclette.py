@@ -15,7 +15,7 @@ from dumpReader import DumpReader
 from atlasrestreader import AtlasRestReader
 
 from tracksaggregator_cy import TracksAggregator
-from delaychangedetector import DelayChangeDetector
+from anomalydetector import AnomalyDetector
 from sqlitesaver import SQLiteSaver
 
 
@@ -53,6 +53,10 @@ class Raclette():
             pass
 
         self.timetrack_converter = config.get("timetrack", "converter")
+        try:
+            self.detection_enabled = int(config.get("anomalydetector", "enable"))
+        except configparser.NoOptionError:
+            self.detection_enabled = 0
 
         self.ip2asn_dir = config.get("lib", "ip2asn_directory")
         self.ip2asn_db = config.get("lib", "ip2asn_db")
@@ -92,12 +96,15 @@ class Raclette():
             [saver_queue.put(
                     ("diffrtt", 
                     (date, locations[0], locations[1], agg["median"], 
-                        agg["conf_high"], agg["conf_low"], agg["min"],
+                        agg["min"],
                         agg["nb_tracks"], agg["nb_probes"], agg["entropy"], 
                         agg["hop"], agg["nb_real_rtts"]))
                 )
                 for locations, agg in results.items()]
             saver_queue.put("COMMIT;")
+            if self.detection_enabled:
+                [self.detector_pipe[1].send((locations, agg)) 
+                        for locations, agg in results.items()]
 
 
     def main(self):
@@ -108,14 +115,16 @@ class Raclette():
         try:
             # Initialisation
             saver_queue = JoinableQueue()
-            detector_pipe = Pipe(False)
 
             # These are run in a separate process
-            detector_delay = DelayChangeDetector(detector_pipe[0], saver_queue)
             saver_sqlite = SQLiteSaver(self.saver_filename, saver_queue)
 
             saver_sqlite.start()
-            detector_delay.start()
+
+            if self.detection_enabled:
+                self.detector_pipe = Pipe(False)
+                detector = AnomalyDetector(self.detector_pipe[0], saver_queue)
+                detector.start()
 
             sys.path.append(self.ip2asn_dir)
             import ip2asn
@@ -147,6 +156,7 @@ class Raclette():
                     aggregates = tm.aggregate()
                     self.save_aggregates(saver_queue, aggregates)
 
+
             logging.info("Finished to read data {}".format(datetime.datetime.today()))
 
             # Try to aggregate remaining track bins
@@ -158,7 +168,8 @@ class Raclette():
             # closing
             saver_queue.join()
             saver_sqlite.terminate()
-            detector_delay.terminate()
+            if self.detection_enabled:
+                detector.terminate()
 
             logging.info("Ended on {}".format(datetime.datetime.today()))
         

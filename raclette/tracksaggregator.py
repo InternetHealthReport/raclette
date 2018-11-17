@@ -20,8 +20,8 @@ def normalized_entropy(pk):
 
 class TracksAggregator():
     """
-    Sort tracks based on their timestamp and compute median differential RTT and
-    wilson score for each time bin.
+    Sort tracks based on their timestamp and compute min and median differential 
+    RTT for each time bin.
     """
 
     def __init__(self, window_size, expiration, significance_level, min_tracks):
@@ -36,7 +36,6 @@ class TracksAggregator():
         self.expiration = expiration
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
-        self.wilson_cache = {}
 
 
     def add_track(self, track):
@@ -63,7 +62,7 @@ class TracksAggregator():
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
         The returned dictionnary provides for each pair of locations found in the
-        tracks, the differential median RTT, wilson scores, entropy of probes ASN, 
+        tracks, the differential median RTT, minimum, entropy of probes ASN, 
         number of diff. RTT samples, number of unique probes."""
 
         results = {}
@@ -87,8 +86,7 @@ class TracksAggregator():
                 count["nb_tracks"] += 1
                 count["hop"].append(hop)
 
-        # Compute median/wilson scores 
-        wilson_conf = None
+        # Compute median
         for locations, count in counters.items():
             if count["nb_tracks"]<self.min_tracks:
                 continue
@@ -96,20 +94,7 @@ class TracksAggregator():
             count["diffrtt"].sort()
             entropy =  normalized_entropy(list(count["nb_tracks_per_asn"].values())) if len(count["nb_tracks_per_asn"])>1 else 0.0
 
-            # Compute the wilson score
-            if len(count["diffrtt"]) in self.wilson_cache:
-                wilson_conf = self.wilson_cache[len(count["diffrtt"])]
-            else:
-                wilson_conf = sm.stats.proportion_confint(
-                        len(count["diffrtt"])/2, 
-                        len(count["diffrtt"]), 
-                        self.significance_level, "wilson")
-                wilson_conf = np.array(wilson_conf)*len(count["diffrtt"])
-                self.wilson_cache[len(count["diffrtt"])] = wilson_conf 
-
             results[locations] = {
-                    "conf_low": count["diffrtt"][int(wilson_conf[0])],
-                    "conf_high": count["diffrtt"][int(wilson_conf[1])],
                     "median": count["diffrtt"][int(len(count["diffrtt"])/2)],
                     "min": count["diffrtt"][0],
                     "nb_tracks": count["nb_tracks"],

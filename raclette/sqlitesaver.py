@@ -39,7 +39,7 @@ class SQLiteSaver(multiprocessing.Process):
         # Table storing aggregated differential RTTs 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt \
                 (ts integer, startpoint text, endpoint text, median real, \
-                minimum real, confhigh real, conflow real, nbtracks integer, \
+                minimum real, nbtracks integer, \
                 nbprobes integer, entropy real, hop integer, nbrealrtts integer,\
                 expid integer, \
                 foreign key(expid) references experiment(id))")
@@ -55,7 +55,7 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON delayanomaly (endpoint)")
 
         # Table storing normal references for delay changes
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayreference (ts integer, startpoint text, endpoint text, median real, confhigh real, conflow real, expid integer, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayreference (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")
         self.cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ts ON delayreference (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON delayreference (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON delayreference (endpoint)")
@@ -81,7 +81,7 @@ class SQLiteSaver(multiprocessing.Process):
                 logging.info("start recording diff. RTTs (ts={})".format(ts))
             
             self.cursor.execute("INSERT INTO diffrtt \
-                    (ts, startpoint, endpoint, median, confhigh, conflow, \
+                    (ts, startpoint, endpoint, median, \
                     minimum, nbtracks, nbprobes, entropy, hop, nbrealrtts, \
                     expid) \
                     VALUES \
@@ -98,5 +98,5 @@ class SQLiteSaver(multiprocessing.Process):
 
         elif t == "delayreference":
             self.cursor.execute("INSERT INTO delayreference \
-            (ts, startpoint, endpoint, median, confhigh, conflow, expid) \
+            (ts, startpoint, endpoint, median, expid) \
             VALUES (?, ?, ?, ?, ?, ?, ?)", data+[self.expid] )
