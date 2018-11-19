@@ -22,14 +22,18 @@ class SQLiteSaver(multiprocessing.Process):
 
         logging.info("Started saver")
         self.createdb()
+        main_running = True
         
-        while True:
+        while main_running or not self.saver_queue.empty():
             elem = self.saver_queue.get()
-            if isinstance(elem, str) and elem.endswith(";"):
-                self.cursor.execute(elem)
+            if isinstance(elem, str):
+                if elem.endswith(";"):
+                    self.cursor.execute(elem)
+                elif elem == "MAIN_FINISHED":
+                    main_running = False
             else:
                 self.save(elem)
-            self.saver_queue.task_done()
+            # self.saver_queue.task_done()
 
     def createdb(self):
         logging.info("Creating databases")
@@ -49,10 +53,10 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_expid ON diffrtt (expid)")
 
         # Table storing anomalous delay changes
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayanomaly (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON delayanomaly (ts)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON delayanomaly (startpoint)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON delayanomaly (endpoint)")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS anomaly (ts integer, startpoint text, endpoint text, delay_anomaly boolean, delay_deviation real, tracks_anomaly, tracks_deviation, expid integer, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON anomaly (ts)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON anomaly (startpoint)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON anomaly (endpoint)")
 
         # Table storing normal references for delay changes
         self.cursor.execute("CREATE TABLE IF NOT EXISTS delayreference (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")
@@ -74,7 +78,7 @@ class SQLiteSaver(multiprocessing.Process):
             return
 
         elif t == "diffrtt":
-            ts, startpoint, endpoint, median, minimum, high, low, nb_tracks, nb_probes, entropy, hop, nbrealrtts = data
+            ts, startpoint, endpoint, median, minimum, nb_tracks, nb_probes, entropy, hop, nbrealrtts = data
 
             if self.prevts != ts:
                 self.prevts = ts
@@ -85,16 +89,17 @@ class SQLiteSaver(multiprocessing.Process):
                     minimum, nbtracks, nbprobes, entropy, hop, nbrealrtts, \
                     expid) \
                     VALUES \
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-                    (ts, startpoint, endpoint, median, minimum, high, low, 
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", 
+                    (ts, startpoint, endpoint, median, minimum, 
                         nb_tracks, nb_probes, entropy, hop, nbrealrtts, 
                         self.expid) )
                     # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )
 
-        elif t == "delayanomaly":
-            self.cursor.execute("INSERT INTO delayanomaly \
-                    (ts, startpoint, endpoint, median, expid) \
-                    VALUES (?, ?, ?, ?, ?)", data+[self.expid])
+        elif t == "anomaly":
+            self.cursor.execute("INSERT INTO anomaly \
+                    (ts, startpoint, endpoint, delay_anomaly, delay_deviation,\
+                    tracks_anomaly, tracks_deviation, expid) \
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)", data+[self.expid])
 
         elif t == "delayreference":
             self.cursor.execute("INSERT INTO delayreference \

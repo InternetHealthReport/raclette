@@ -6,7 +6,7 @@ from collections import defaultdict
 import pickle
 import configparser
 import argparse
-from multiprocessing import Process, Pool, JoinableQueue, Pipe
+from multiprocessing import Process, Pool, Queue, Pipe
 import importlib
 import traceback
 
@@ -103,7 +103,7 @@ class Raclette():
                 for locations, agg in results.items()]
             saver_queue.put("COMMIT;")
             if self.detection_enabled:
-                [self.detector_pipe[1].send((locations, agg)) 
+                [self.detector_pipe[1].send((date, locations, agg)) 
                         for locations, agg in results.items()]
 
 
@@ -114,7 +114,7 @@ class Raclette():
 
         try:
             # Initialisation
-            saver_queue = JoinableQueue()
+            saver_queue = Queue()
 
             # These are run in a separate process
             saver_sqlite = SQLiteSaver(self.saver_filename, saver_queue)
@@ -166,8 +166,9 @@ class Raclette():
             logging.info("Number of ignored tracks {}".format(tm.nb_ignored_tracks))
 
             # closing
-            saver_queue.join()
-            saver_sqlite.terminate()
+            saver_queue.put("MAIN_FINISHED")
+            saver_sqlite.join()
+            # saver_sqlite.terminate()
             if self.detection_enabled:
                 detector.terminate()
 

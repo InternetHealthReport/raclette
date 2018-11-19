@@ -334,6 +334,7 @@ if __name__ == "__main__":
     expid=1
     if len(sys.argv)>4:
         expid = int(sys.argv[4])
+        print("Fetching results for expid={}".format(expid))
 
     pl = Plotter(db) 
 
