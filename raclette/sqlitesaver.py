@@ -101,7 +101,7 @@ class SQLiteSaver(multiprocessing.Process):
         elif t == "anomaly":
             self.cursor.execute("INSERT INTO anomaly \
                     (ts, startpoint, endpoint, anomaly, reliability, expid) \
-                    VALUES (?, ?, ?, ?, ?)", data+[self.expid])
+                    VALUES (?, ?, ?, ?, ?, ?)", data+[self.expid])
 
         elif t == "delayreference":
             self.cursor.execute("INSERT INTO delayreference \
