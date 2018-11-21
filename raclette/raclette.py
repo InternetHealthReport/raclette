@@ -11,12 +11,9 @@ import importlib
 import traceback
 
 import tools
-from dumpReader import DumpReader
-from atlasrestreader import AtlasRestReader
 
 from tracksaggregator_cy import TracksAggregator
 from anomalydetector import AnomalyDetector
-from sqlitesaver import SQLiteSaver
 
 
 class Raclette():
@@ -39,6 +36,12 @@ class Raclette():
         # Read the config file
         config = configparser.ConfigParser()
         config.read(args.config_file)
+
+        try:
+            self.reader = config.get("io", "reader")
+        except configparser.NoOptionError:
+            # Default to Atlas REST 
+            self.reader = "atlasrestreader"
 
         self.atlas_start =  tools.valid_date(config.get("io", "start"))
         self.atlas_stop =  tools.valid_date(config.get("io", "stop"))
@@ -66,6 +69,12 @@ class Raclette():
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
         self.tm_min_tracks = int(config.get("tracksaggregator", "min_tracks"))
+
+        try:
+            self.saver = config.get("io", "saver")
+        except configparser.NoOptionError:
+            # Default to SQLite saver 
+            self.saver = "sqlitesaver"
 
         self.saver_filename = config.get("io", "results")
         self.log_filename = config.get("io", "log")
@@ -113,19 +122,25 @@ class Raclette():
         """
 
         try:
-            # Initialisation
+            # Saver initialisation
             saver_queue = Queue()
+            try:
+                saver_module = importlib.import_module(self.saver)
+                # These are run in a separate process
+                saver = saver_module.Saver(self.saver_filename, saver_queue)
+                saver.start()
+            except ImportError:
+                logging.error("Saver unknown! ({})".format(self.saver))
+                traceback.print_exc(file=sys.stdout)
+                return
 
-            # These are run in a separate process
-            saver_sqlite = SQLiteSaver(self.saver_filename, saver_queue)
-
-            saver_sqlite.start()
-
+            # Detector initialisation
             if self.detection_enabled:
                 self.detector_pipe = Pipe(False)
                 detector = AnomalyDetector(self.detector_pipe[0], saver_queue)
                 detector.start()
 
+            # Time Track initialisation
             sys.path.append(self.ip2asn_dir)
             import ip2asn
             i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
@@ -138,13 +153,21 @@ class Raclette():
                 traceback.print_exc(file=sys.stdout)
                 return
 
+            # Aggregator initialisation
             tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
-
             saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
-            tr_reader = AtlasRestReader(self.atlas_start, self.atlas_stop, timetrackconverter, 
+            # Reader initialisation
+            try:
+                reader_module = importlib.import_module(self.reader)
+                tr_reader = reader_module.Reader(self.atlas_start, self.atlas_stop, timetrackconverter, 
                     self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) 
             # tr_reader  = DumpReader(dump_name, dump_filter)
+            except ImportError:
+                logging.error("Reader unknown! ({})".format(self.reader))
+                traceback.print_exc(file=sys.stdout)
+                return
+
 
             # # Main Loop:
             with tr_reader:
@@ -167,8 +190,8 @@ class Raclette():
 
             # closing
             saver_queue.put("MAIN_FINISHED")
-            saver_sqlite.join()
-            # saver_sqlite.terminate()
+            saver.join()
+            # saver.terminate()
             if self.detection_enabled:
                 detector.terminate()
 

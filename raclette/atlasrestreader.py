@@ -85,7 +85,7 @@ def get_results(param, retry=3):
                 # return
 
 
-class AtlasRestReader():
+class Reader():
 
     def __init__(self, start, end, timetrack_converter, msm_ids=[5001,5004,5005], 
             probe_ids=[1,2,3,4,5,6,7,8], chunk_size=900):

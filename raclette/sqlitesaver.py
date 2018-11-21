@@ -2,7 +2,7 @@ import apsw
 import multiprocessing
 import logging
 
-class SQLiteSaver(multiprocessing.Process):
+class Saver(multiprocessing.Process):
     """Dumps data to a SQLite database. """
 
     def __init__(self, filename, saver_queue):
@@ -86,11 +86,9 @@ class SQLiteSaver(multiprocessing.Process):
                 logging.info("start recording diff. RTTs (ts={})".format(ts))
             
             self.cursor.execute("INSERT INTO diffrtt \
-                    (ts, startpoint, endpoint, median, \
-                    minimum, nbtracks, nbprobes, entropy, hop, nbrealrtts, \
-                    expid) \
-                    VALUES \
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", 
+                    (ts, startpoint, endpoint, median, minimum, nbtracks, \
+                    nbprobes, entropy, hop, nbrealrtts, expid) \
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", 
                     (ts, startpoint, endpoint, median, minimum, 
                         nb_tracks, nb_probes, entropy, hop, nbrealrtts, 
                         self.expid) )
