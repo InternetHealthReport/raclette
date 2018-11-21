@@ -118,6 +118,9 @@ class AnomalyDetector(multiprocessing.Process):
         if dev < min_dev:
             dev = min_dev
 
+        if dev == 0:
+            return 0
+
         return (value-median)/(dev)
 
 
