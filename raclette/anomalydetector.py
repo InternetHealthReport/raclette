@@ -4,6 +4,7 @@ from collections import deque, defaultdict
 from bisect import insort, bisect_left
 from itertools import islice
 import numpy as np
+import json
 
 
 class History():
@@ -53,10 +54,10 @@ class AnomalyDetector(multiprocessing.Process):
         self.saver_queue = saver_queue
 
         self.window_size = window_size
-        self.history_tracks = defaultdict(lambda:History(window_size))
-        self.history_conf_high= defaultdict(lambda:History(window_size))
-        self.history_conf_low = defaultdict(lambda:History(window_size))
-        self.history_median = defaultdict(lambda:History(window_size))
+        self.metrics = [ "nb_tracks", "median", "hop", "nb_real_rtts", 
+                "nb_probes", "entropy"]
+        self.reported_metrics = ["median", "nb_tracks"]
+        self.history= defaultdict(lambda:defaultdict(lambda:History(window_size)))
         self.threshold = threshold
         self.min_dev_perc = min_dev_perc
 
@@ -67,27 +68,40 @@ class AnomalyDetector(multiprocessing.Process):
             date, locations, agg_tracks = self.input_pipe.recv()
 
             # Update histories with new values
-            self.history_tracks[locations].update(agg_tracks["nb_tracks"])
-            self.history_median[locations].update(agg_tracks["median"])
+            for metric in self.metrics:
+                self.history[metric][locations].update(agg_tracks[metric])
 
-            if len(self.history_tracks[locations].sorted_values)>self.window_size/2:
-                anomaly_delay = False
-                anomaly_tracks = False
-                dev_delay = self.mad_detection(self.history_median[locations], agg_tracks["median"])
-                if self.threshold < abs(dev_delay):
-                    anomaly_delay = True
+            # Look for anomalies only if we have enough samples
+            if len(self.history["nb_tracks"][locations].sorted_values)>self.window_size/2:
+                anomaly = False
 
-                # Check for abnormal number of tracks
-                dev_tracks = self.mad_detection(self.history_tracks[locations], agg_tracks["nb_tracks"])
-                if self.threshold < abs(dev_tracks):
-                    anomaly_tracks = True
+                dev = defaultdict(float)
+                for metric in self.reported_metrics:
+                    dev[metric] = self.mad_detection(
+                            self.history[metric][locations], agg_tracks[metric])
+                    if self.threshold < abs(dev[metric]):
+                        anomaly = True
 
-                if anomaly_delay or anomaly_tracks:
+                if anomaly:
+                    # Compute reliability
+                    for metric in self.metrics:
+                        if metric not in self.reported_metrics:
+                            dev[metric] = self.mad_detection(
+                                    self.history[metric][locations], 
+                                    agg_tracks[metric])
+
+                    asym = int(0.5+
+                            1-(agg_tracks["nb_real_rtts"]/agg_tracks["nb_tracks"]))
+                    # TODO check entropy for in-network anomalies
+                    # asym*(1-agg_tracks["entropy"])+
+
+                    reliability = np.mean([d for m, d in dev.items()
+                                    if m not in ["median", "nb_tracks"]])
+                    
                     self.saver_queue.put(
                         ("anomaly", [
                             date, locations[0], locations[1], 
-                            anomaly_delay, dev_delay, 
-                            anomaly_tracks, dev_tracks, 
+                            json.dumps(dev), reliability
                             ])
                         )
             

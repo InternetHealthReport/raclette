@@ -53,7 +53,10 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_expid ON diffrtt (expid)")
 
         # Table storing anomalous delay changes
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS anomaly (ts integer, startpoint text, endpoint text, delay_anomaly boolean, delay_deviation real, tracks_anomaly, tracks_deviation, expid integer, foreign key(expid) references experiment(id))")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS anomaly \
+                (ts integer, startpoint text, endpoint text, anomaly json, \
+                reliability real, expid integer, \
+                foreign key(expid) references experiment(id))")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON anomaly (ts)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON anomaly (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON anomaly (endpoint)")
@@ -97,9 +100,8 @@ class SQLiteSaver(multiprocessing.Process):
 
         elif t == "anomaly":
             self.cursor.execute("INSERT INTO anomaly \
-                    (ts, startpoint, endpoint, delay_anomaly, delay_deviation,\
-                    tracks_anomaly, tracks_deviation, expid) \
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)", data+[self.expid])
+                    (ts, startpoint, endpoint, anomaly, reliability, expid) \
+                    VALUES (?, ?, ?, ?, ?)", data+[self.expid])
 
         elif t == "delayreference":
             self.cursor.execute("INSERT INTO delayreference \
