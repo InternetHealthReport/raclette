@@ -95,7 +95,7 @@ class AnomalyDetector(multiprocessing.Process):
                     # TODO check entropy for in-network anomalies
                     # asym*(1-agg_tracks["entropy"])+
 
-                    reliability = np.mean([d for m, d in dev.items()
+                    reliability = np.mean([np.abs(d) for m, d in dev.items()
                                     if m not in ["median", "nb_tracks"]])
                     
                     self.saver_queue.put(
