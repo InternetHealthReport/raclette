@@ -38,7 +38,8 @@ class SQLiteSaver(multiprocessing.Process):
     def createdb(self):
         logging.info("Creating databases")
         # Table storing experiements parameters
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment (id integer primary key, date text, cmd text, args text)")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS experiment \
+                (id integer primary key, date text, cmd text, args text)")
 
         # Table storing aggregated differential RTTs 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt \
@@ -61,20 +62,17 @@ class SQLiteSaver(multiprocessing.Process):
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON anomaly (startpoint)")
         self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON anomaly (endpoint)")
 
-        # Table storing normal references for delay changes
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS delayreference (ts integer, startpoint text, endpoint text, median real, expid integer, foreign key(expid) references experiment(id))")
-        self.cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ts ON delayreference (ts)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_startpoint ON delayreference (startpoint)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_endpoint ON delayreference (endpoint)")
 
     def save(self, elem):
         t, data = elem
 
         if t == "experiment":
-            self.cursor.execute("INSERT INTO experiment(date, cmd, args) VALUES (?, ?, ?)", (str(data[0]), data[1], data[2]))
+            self.cursor.execute("INSERT INTO experiment(date, cmd, args) \
+                    VALUES (?, ?, ?)", (str(data[0]), data[1], data[2]))
             self.expid = self.conn.last_insert_rowid()
             if self.expid != 1:
-                logging.warning("Database exists: results will be stored with experiment ID (expid) = %s" % self.expid)
+                logging.warning("Database exists: \
+                results will be stored with experiment ID (expid) = %s" % self.expid)
 
         if not self.expid:
             logging.error("No experiment inserted for this data")
@@ -96,14 +94,9 @@ class SQLiteSaver(multiprocessing.Process):
                     (ts, startpoint, endpoint, median, minimum, 
                         nb_tracks, nb_probes, entropy, hop, nbrealrtts, 
                         self.expid) )
-                    # zip([ts]*len(hege), [scope]*len(hege), hege.keys(), hege.values(), [self.expid]*len(hege)) )
 
         elif t == "anomaly":
             self.cursor.execute("INSERT INTO anomaly \
                     (ts, startpoint, endpoint, anomaly, reliability, expid) \
                     VALUES (?, ?, ?, ?, ?, ?)", data+[self.expid])
 
-        elif t == "delayreference":
-            self.cursor.execute("INSERT INTO delayreference \
-            (ts, startpoint, endpoint, median, expid) \
-            VALUES (?, ?, ?, ?, ?, ?, ?)", data+[self.expid] )
