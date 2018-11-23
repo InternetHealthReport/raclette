@@ -44,7 +44,7 @@ class Saver(multiprocessing.Process):
         # Table storing aggregated differential RTTs 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS diffrtt \
                 (ts integer, startpoint text, endpoint text, median real, \
-                minimum real, nbtracks integer, \
+                minimum real, nbsamples integer, nbtracks integer, \
                 nbprobes integer, entropy real, hop integer, nbrealrtts integer,\
                 expid integer, \
                 foreign key(expid) references experiment(id))")
@@ -79,17 +79,18 @@ class Saver(multiprocessing.Process):
             return
 
         elif t == "diffrtt":
-            ts, startpoint, endpoint, median, minimum, nb_tracks, nb_probes, entropy, hop, nbrealrtts = data
+            (ts, startpoint, endpoint, median, minimum, nb_samples, nb_tracks, 
+                    nb_probes, entropy, hop, nbrealrtts) = data
 
             if self.prevts != ts:
                 self.prevts = ts
                 logging.info("start recording diff. RTTs (ts={})".format(ts))
             
             self.cursor.execute("INSERT INTO diffrtt \
-                    (ts, startpoint, endpoint, median, minimum, nbtracks, \
-                    nbprobes, entropy, hop, nbrealrtts, expid) \
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", 
-                    (ts, startpoint, endpoint, median, minimum, 
+                    (ts, startpoint, endpoint, median, minimum, nbsamples, \
+                    nbtracks, nbprobes, entropy, hop, nbrealrtts, expid) \
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", 
+                    (ts, startpoint, endpoint, median, minimum, nb_samples,
                         nb_tracks, nb_probes, entropy, hop, nbrealrtts, 
                         self.expid) )
 

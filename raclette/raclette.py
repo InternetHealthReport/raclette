@@ -105,7 +105,7 @@ class Raclette():
             [saver_queue.put(
                     ("diffrtt", 
                     (date, locations[0], locations[1], agg["median"], 
-                        agg["min"],
+                        agg["min"], agg["nb_samples"],
                         agg["nb_tracks"], agg["nb_probes"], agg["entropy"], 
                         agg["hop"], agg["nb_real_rtts"]))
                 )

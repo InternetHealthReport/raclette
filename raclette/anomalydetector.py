@@ -54,9 +54,9 @@ class AnomalyDetector(multiprocessing.Process):
         self.saver_queue = saver_queue
 
         self.window_size = window_size
-        self.metrics = [ "nb_tracks", "median", "hop", "nb_real_rtts", 
-                "nb_probes", "entropy"]
-        self.reported_metrics = ["median", "nb_tracks"]
+        self.metrics = [ "nb_samples", "nb_tracks", "median", "hop", 
+                "nb_real_rtts", "nb_probes", "entropy"]
+        self.reported_metrics = ["median", "nb_samples"]
         self.history= defaultdict(lambda:defaultdict(lambda:History(window_size)))
         self.threshold = threshold
         self.min_dev_perc = min_dev_perc
@@ -72,7 +72,7 @@ class AnomalyDetector(multiprocessing.Process):
                 self.history[metric][locations].update(agg_tracks[metric])
 
             # Look for anomalies only if we have enough samples
-            if len(self.history["nb_tracks"][locations].sorted_values)>self.window_size/2:
+            if len(self.history["median"][locations].sorted_values)>self.window_size/2:
                 anomaly = False
 
                 dev = defaultdict(float)
@@ -96,7 +96,7 @@ class AnomalyDetector(multiprocessing.Process):
                     # asym*(1-agg_tracks["entropy"])+
 
                     reliability = np.mean([np.abs(d) for m, d in dev.items()
-                                    if m not in ["median", "nb_tracks"]])
+                                    if m not in self.reported_metrics])
                     
                     self.saver_queue.put(
                         ("anomaly", [

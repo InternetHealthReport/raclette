@@ -142,44 +142,40 @@ class TracksAggregator():
             "unique_probes": set(),
             "nb_tracks_per_asn": defaultdict(int),
             "nb_tracks": 0,
+            "nb_samples": 0,
             "hop": [],
             "nb_real_rtts": 0,
             })
         nb_hops_cache = self.nb_hops_cache
         logging.info("Computing differential RTTs")
 
-        try:
-            for track in tracks:
-                nblocations = len(track["rtts"])
-                from_asn = track["from_asn"]
-                prb_id = track["prb_id"]
+        for track in tracks:
+            nblocations = len(track["rtts"])
+            from_asn = track["from_asn"]
+            prb_id = track["prb_id"]
 
-                try:
-                    nb_hops = nb_hops_cache[nblocations]
-                except KeyError:
-                    nb_hops = [hopnb for i in range(nblocations-1,0,-1) 
-                            for hopnb in range(1,i+1)]
-                    self.nb_hops_cache[nblocations] = nb_hops
+            try:
+                nb_hops = nb_hops_cache[nblocations]
+            except KeyError:
+                nb_hops = [hopnb for i in range(nblocations-1,0,-1) 
+                        for hopnb in range(1,i+1)]
+                self.nb_hops_cache[nblocations] = nb_hops
 
-                for hop, diffrtt, locations in \
-                    enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
-                        count = counters[locations]
-                        count["diffrtt"] += diffrtt 
-                        count["nb_tracks_per_asn"][from_asn] += 1
-                        count["unique_probes"].add(prb_id)
-                        count["nb_tracks"] += 1
-                        count["hop"].append(hop)
-                        # If the locations correspond to the source locations
-                        # or the probe ASN then we count this as a real RTT
-                        # sample
-                        if locations[0] in track["rtts"][0][0] \
-                            or locations[0] == track["from_asn"]:
-                                count["nb_real_rtts"] += 1
-
-
-        except Exception as e:
-            print("type error: " + str(e))
-            print(traceback.format_exc())
+            for hop, diffrtt, locations in \
+                enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
+                    count = counters[locations]
+                    count["diffrtt"] += diffrtt 
+                    count["nb_tracks_per_asn"][from_asn] += 1
+                    count["unique_probes"].add(prb_id)
+                    count["nb_tracks"] += 1
+                    count["nb_samples"] += len(diffrtt)
+                    count["hop"].append(hop)
+                    # If the locations correspond to the source locations
+                    # or the probe ASN then we count this as a real RTT
+                    # sample
+                    if locations[0] in track["rtts"][0][0] \
+                        or locations[0] == track["from_asn"]:
+                            count["nb_real_rtts"] += 1
 
         logging.info("Computing statistics")
         # Compute median
@@ -235,6 +231,7 @@ class TracksAggregator():
                     "median": count["diffrtt"][int(nbsamples/2)],
                     "min": count["diffrtt"][0],
                     "nb_tracks": count["nb_tracks"],
+                    "nb_samples": count["nb_samples"],
                     "nb_probes": len(count["unique_probes"]),
                     "entropy": entropy,
                     "hop": np.median(count["hop"]),
