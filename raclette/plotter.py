@@ -143,7 +143,7 @@ class Plotter(object):
     def metric_over_time(self, startpoint, endpoint, metric="median", 
             filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", 
             ylim=None, geo_resolution=None, group = True, label=None, 
-            startpoint_label=None, endpoint_label=None):
+            startpoint_label=None, endpoint_label=None, displayed_anomaly=3):
         """Plot a metric (e.g. median, nbtracks, or nbpobes) for the given locations.
 
         Args:
@@ -157,7 +157,11 @@ class Plotter(object):
             geo_resolution (str): Replace probes by their geolocation if set to
             'name', 'admin1', 'admin2', or 'cc'.
             group (bool): Plot all graph in one figure if True.
-
+            label (str): Label for non-grouped plot.
+            startpoint_label (str): To change the label for the startpoint.
+            endpoint_label (str): To change the label for the endpoint.
+            displayed_anomaly (float): Display anomalies with a reliability score
+            lower than the given value. Set to -1 to not show anomalies.
 
         """
 
@@ -165,13 +169,36 @@ class Plotter(object):
         endpoint_label = location2str(endpoint) if endpoint_label is None else endpoint_label
         startpoint_label = location2str(startpoint) if startpoint_label is None else startpoint_label
 
-        for conn in self.conn:
-            all_df.append(pd.read_sql_query( 
-                ("SELECT * " 
-                "FROM diffrtt "
-                "WHERE expid=? and startpoint like ? and endpoint like ? "
-                "ORDER BY ts"), 
-                conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+        if displayed_anomaly>=0:
+            for conn in self.conn:
+                # all_df.append(pd.read_sql_query(
+                    # "select diffrtt.*, anomaly.anomaly as anomaly, anomaly.reliability as reliability from diffrtt left join anomaly ON diffrtt.expid=anomaly.expid and diffrtt.startpoint=anomaly.startpoint and diffrtt.endpoint = anomaly.endpoint and diffrtt.ts = anomaly.ts where reliability > 0 limit 10;",
+                    # conn,"ts", parse_dates=["ts"] 
+                    # ))
+                all_df.append(pd.read_sql_query( 
+                    ("SELECT diffrtt.*, anomaly, reliability " 
+                    "FROM diffrtt "
+                    "LEFT JOIN anomaly ON diffrtt.ts=anomaly.ts AND "
+                    "diffrtt.expid=anomaly.expid AND "
+                    "diffrtt.startpoint=anomaly.startpoint AND "
+                    "diffrtt.endpoint=anomaly.endpoint "
+                    "WHERE diffrtt.expid=? AND "
+                    "diffrtt.startpoint like ? AND "
+                    "diffrtt.endpoint like ? "
+                    "ORDER BY ts"), 
+                    conn, "ts", 
+                    params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+                print(all_df[-1])
+            
+        else:
+            for conn in self.conn:
+                all_df.append(pd.read_sql_query( 
+                    ("SELECT * " 
+                    "FROM diffrtt "
+                    "WHERE expid=? and startpoint like ? and endpoint like ? "
+                    "ORDER BY ts"), 
+                    conn, "ts", params=(expid, startpoint, endpoint), parse_dates=["ts"]) )
+
             
         diffrtt = pd.concat(all_df)
         diffrtt.index = diffrtt.index.tz_localize("UTC")
@@ -211,6 +238,15 @@ class Plotter(object):
                     location2str(locations[0]), 
                     location2str(locations[1]), 
                     nb_probes_per_geo[locations[0]]))
+
+            # Plot anomalous times
+            if displayed_anomaly>=0:
+                anomalies = diffrtt[diffrtt["anomaly"].notnull()] 
+                anomalies = anomalies[ anomalies["reliability"]<=displayed_anomaly]
+                if len(anomalies):
+                    plt.plot(anomalies[metric], 'xr')
+                
+            
         
             plt.gca().xaxis_date(tz)
             if metric == "median":
