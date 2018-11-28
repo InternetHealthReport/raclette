@@ -4,6 +4,7 @@ import calendar
 import logging
 import itertools 
 import threading 
+import json
 from requests_futures.sessions import FuturesSession
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -36,7 +37,12 @@ def requests_retry_session(
 
 def worker_task(sess, resp):
     """Process json in background"""
-    resp.data = resp.json()
+    try:
+        resp.data = resp.json()
+    except json.decoder.JSONDecodeError:
+        logging.error("Error while reading Atlas json data.\n")
+        resp.data = {}
+
 
 def cousteau_on_steroid(params, retry=3):
     url = "https://atlas.ripe.net/api/v2/measurements/{0}/results"
