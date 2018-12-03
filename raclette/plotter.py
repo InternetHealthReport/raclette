@@ -376,6 +376,7 @@ if __name__ == "__main__":
 
     pl.metric_over_time(startpoint, endpoint, expid=expid)
     pl.metric_over_time(startpoint, endpoint, "nbtracks", expid=expid)
+    pl.metric_over_time(startpoint, endpoint, "hop", expid=expid)
     pl.metric_over_time(startpoint, endpoint, "nbprobes", expid=expid)
     pl.metric_over_time(startpoint, endpoint, "entropy", expid=expid)
     pl.metric_over_time(startpoint, endpoint, "nbsamples", expid=expid)
