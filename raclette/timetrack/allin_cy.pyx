@@ -38,8 +38,8 @@ class TimeTrackConverter():
             except TypeError:
                 continue
 
-        for ip, city, country in tools.read_ipmap_data():
-            self.ipmap[ip] = "CT{}, {}".format(city, country)
+        for ip, city, state, country in tools.read_ipmap_data(50):
+            self.ipmap[ip] = "CT{}, {}, {}".format(city, state, country)
 
         logging.info("Ready to convert traceroutes! (loaded {} probes info)"
                 .format(len(self.probe_info)))

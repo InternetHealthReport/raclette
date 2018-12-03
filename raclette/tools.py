@@ -29,11 +29,12 @@ def valid_date(s):
         msg = "Not a valid date: '{0}'. Accepted format is YYYY-MM-DDThh:mm, for example 2018-06-01T00:00".format(s)
         raise argparse.ArgumentTypeError(msg)
 
-def read_ipmap_data():
+def read_ipmap_data(score):
     with bz2.open("cache/geolocations_ipmap.csv.bz2", "rt") as bz_file:
         for line in bz_file:
             words = line.rstrip('\n').split(',')
-            yield (words[0].rstrip("/32"), words[2], words[5])
+            if int(words[-1]) >= score:
+                yield (words[0].rstrip("/32"), words[2], words[3], words[5])
 
 def get_probes_info():
     today = datetime.datetime.today()
