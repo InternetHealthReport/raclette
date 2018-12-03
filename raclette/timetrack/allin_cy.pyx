@@ -26,6 +26,7 @@ class TimeTrackConverter():
         self.i2a = i2a
         self.probe_info = {}
         self.probe_addresses = {}
+        self.ipmap = {}
         for probe in tools.get_probes_info():
             try:
                 prb_id = str(probe["id"])
@@ -36,6 +37,10 @@ class TimeTrackConverter():
                 self.probe_addresses[probe["address_v6"]]= prb_id
             except TypeError:
                 continue
+
+        for ip, city, country in tools.read_ipmap_data():
+            self.ipmap[ip] = "CT{}, {}".format(city, country)
+
         logging.info("Ready to convert traceroutes! (loaded {} probes info)"
                 .format(len(self.probe_info)))
 
@@ -116,14 +121,20 @@ class TimeTrackConverter():
                             router_ip = res_from
                             
                             # Add city if needed
+                            locations = [location_str]
                             if router_ip == trace["dst_addr"] \
                                     and trace["dst_addr"] in self.probe_addresses:
 
-                                dest_city = self.probe_info[
-                                        self.probe_addresses[trace["dst_addr"]]].get("city") 
+                                pid = self.probe_addresses[trace["dst_addr"]]
+                                locations.append("PB"+str(pid))
+                                dest_city = self.probe_info[pid].get("city") 
                                 if dest_city is not None:
-                                    location_str= "|".join([
-                                        location_str,dest_city])
+                                    locations.append(dest_city)
+
+                            elif router_ip in self.ipmap:
+                                locations.append(self.ipmap[router_ip])
+
+                            location_str= "|".join(locations)
 
                         idx = -1
                         # location comparisons are much faster with strings (than list of strings)!
