@@ -47,14 +47,15 @@ log = results/ASC_start/log_%(start)s.log
 
 [timetrack]
 converter = allin_cy
-add_probe = yes
 
 [tracksaggregator]
-expiration = 10000
 window_size = 1800
 significance_level = 0.05
 # ignore links visited by small number of tracks/traceroutes
 min_tracks = 3 
+
+[anomalydetector]
+enable=1
 
 [lib]
 ip2asn_directory = raclette/lib/
