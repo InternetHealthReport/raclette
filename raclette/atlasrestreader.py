@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from progress.bar import Bar
 
 # Semaphore used to control the number of buffered results from the pool
-semaphore = threading.Semaphore(4) 
+# semaphore = threading.Semaphore(4) 
 
 def requests_retry_session(
     retries=3,
@@ -74,8 +74,8 @@ def cousteau_on_steroid(params, retry=3):
 def get_results(param, retry=3):
     traceroute2timetrack, kwargs = param
 
-    if retry==3 :
-        semaphore.acquire()
+    # if retry==3 :
+        # semaphore.acquire()
 
     # logging.info("Requesting results for {}".format(kwargs))
     # success_list, results_list = AtlasResultsRequest(**kwargs).create()
@@ -148,7 +148,7 @@ class Reader():
             for tracks in res: 
                 yield from tracks
                 
-            semaphore.release()
+            # semaphore.release()
             self.bar.next()
 
 

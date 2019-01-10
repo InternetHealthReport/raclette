@@ -65,7 +65,6 @@ class Raclette():
         self.ip2asn_db = config.get("lib", "ip2asn_db")
         self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
 
-        self.tm_expiration = int(config.get("tracksaggregator", "expiration"))
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
         self.tm_min_tracks = int(config.get("tracksaggregator", "min_tracks"))
@@ -154,7 +153,7 @@ class Raclette():
                 return
 
             # Aggregator initialisation
-            tm = TracksAggregator(self.tm_window_size, self.tm_expiration, self.tm_significance_level, self.tm_min_tracks)
+            tm = TracksAggregator(self.tm_window_size, self.tm_significance_level, self.tm_min_tracks)
             saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
 
             # Reader initialisation
@@ -175,14 +174,13 @@ class Raclette():
                     if not track:
                         continue
 
-                    tm.add_track(track) 
-                    aggregates = tm.aggregate()
-                    self.save_aggregates(saver_queue, aggregates)
-
+                    aggregates = tm.add_track(track) 
+                    if aggregates:
+                        self.save_aggregates(saver_queue, aggregates)
 
             logging.info("Finished to read data {}".format(datetime.datetime.today()))
 
-            # Try to aggregate remaining track bins
+            # Try to get results from remaining track bins
             aggregates = tm.aggregate(force_expiration=0.5)
             self.save_aggregates(saver_queue, aggregates)
 

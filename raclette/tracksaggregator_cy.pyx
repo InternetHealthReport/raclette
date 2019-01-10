@@ -83,19 +83,20 @@ class TracksAggregator():
     differential RTT for each time bin.
     """
 
-    def __init__(self, window_size, expiration, significance_level, min_tracks):
+    def __init__(self, window_size, significance_level, min_tracks):
         self.window_size = window_size
         self.significance_level = significance_level
         self.min_tracks = min_tracks
         self.nb_ignored_tracks = 0
         self.nb_empty_tracks = 0
-        self.nb_tracks = 0
         self.track_bins = {}
         self.bins_last_insert= defaultdict(int)
-        self.expiration = expiration
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
         self.nb_hops_cache = {}
+        self.prev_msmid = 0
+        self.seen_msmid = set()
+        self.nb_cycles = 0
 
 
     def add_track(self, track):
@@ -104,7 +105,6 @@ class TracksAggregator():
         cdef double win_size = self.window_size
         cdef long ts = track["timestamp"]
 
-        self.nb_tracks += 1
         if not track :
             self.nb_empty_tracks += 1
             return
@@ -120,7 +120,20 @@ class TracksAggregator():
         except KeyError:
             self.track_bins[bin_id] = [track]
 
-        self.bins_last_insert[bin_id] = self.nb_tracks
+        # Track cycles to sense completed bins
+        if self.prev_msmid != track["msm_id"]:
+            # Get results from another measurement
+            self.prev_msmid = track["msm_id"]
+            nb_msm = len(self.seen_msmid)
+            self.seen_msmid.add(track["msm_id"])
+            
+            if nb_msm == len(self.seen_msmid):
+                # Completed one cycle
+                self.nb_cycles += 1
+                self.bins_last_insert[bin_id] = self.nb_cycles
+                return self.aggregate()
+
+        self.bins_last_insert[bin_id] = self.nb_cycles
 
 
     @cython.boundscheck(False) 
@@ -250,33 +263,30 @@ class TracksAggregator():
 
         results = {} 
 
-        if self.nb_tracks % self.expiration == 0 or force_expiration:
+        logging.debug("Running results collection")
+        expired_bins = []
 
-            logging.debug("Running results collection")
-            expired_bins = []
+        for date, tracks in self.track_bins.items():
 
-            for date, tracks in self.track_bins.items():
+            if self.bins_last_insert[date]+1 < self.nb_cycles or force_expiration:
+                if force_expiration and not len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
+                    continue
+                else:
+                    logging.debug("Force expiration for bin {}".format(date))
 
-                if self.bins_last_insert[date]+self.expiration < self.nb_tracks \
-                        or force_expiration:
-                    if force_expiration and not len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
-                        continue
-                    else:
-                        logging.debug("Force expiration for bin {}".format(date))
+                logging.info("Processing bin {} ({} tracks)".format(date, len(tracks)))
+                expired_bins.append(date)
 
-                    logging.info("Processing bin {}".format(date))
-                    expired_bins.append(date)
+                timebin = date*self.window_size+self.window_size/2
+                results[timebin] = self.compute_median_diff_rtt(tracks)
+                self.nb_expired_tracks += len(tracks)
+                self.nb_expired_bins += 1
+                logging.info("Finished processing bin {}".format(date))
 
-                    timebin = date*self.window_size+self.window_size/2
-                    results[timebin] = self.compute_median_diff_rtt(tracks)
-                    self.nb_expired_tracks += len(tracks)
-                    self.nb_expired_bins += 1
-                    logging.info("Finished processing bin {}".format(date))
-
-            # remember expired dates and delete corresponding bins
-            for date in expired_bins:
-                self.bins_last_insert[date] = None 
-                del self.track_bins[date]
+        # remember expired dates and delete corresponding bins
+        for date in expired_bins:
+            self.bins_last_insert[date] = None 
+            del self.track_bins[date]
 
         return results
 
