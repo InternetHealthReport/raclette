@@ -95,7 +95,7 @@ class TracksAggregator():
         self.nb_expired_tracks = 0
         self.nb_hops_cache = {}
         self.prev_msmid = 0
-        self.seen_msmid = set()
+        self.last_cycle_msmid = set()
         self.nb_cycles = 0
 
 
@@ -124,12 +124,13 @@ class TracksAggregator():
         if self.prev_msmid != track["msm_id"]:
             # Get results from another measurement
             self.prev_msmid = track["msm_id"]
-            nb_msm = len(self.seen_msmid)
-            self.seen_msmid.add(track["msm_id"])
+            nb_msm = len(self.last_cycle_msmid)
+            self.last_cycle_msmid.add(track["msm_id"])
             
-            if nb_msm == len(self.seen_msmid):
+            if nb_msm == len(self.last_cycle_msmid):
                 # Completed one cycle
                 self.nb_cycles += 1
+                self.last_cycle_msmid = set() 
                 self.bins_last_insert[bin_id] = self.nb_cycles
                 return self.aggregate()
 
