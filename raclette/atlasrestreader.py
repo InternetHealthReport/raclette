@@ -6,6 +6,7 @@ import itertools
 import threading 
 import json
 from requests_futures.sessions import FuturesSession
+import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
@@ -52,7 +53,7 @@ def cousteau_on_steroid(params, retry=3):
             }
     
     if params["probe_ids"]:
-        req_param["probe_ids"] = params["probe_ids"]
+        req_param["probe_ids"] = ",".join([str(i) for i in params["probe_ids"]])
 
     queries = []
 
@@ -63,8 +64,11 @@ def cousteau_on_steroid(params, retry=3):
             ) )
 
     for query in queries:
-        resp = query.result()
-        yield (resp.ok, resp.data)
+        try:
+            resp = query.result()
+            yield resp
+        except requests.exceptions.ChunkedEncodingError:
+            logging.error("Could not retrieve traceroutes for {}".format(query))
 
 
 def get_results(param, retry=3):
@@ -78,11 +82,12 @@ def get_results(param, retry=3):
     results_list = cousteau_on_steroid(kwargs)
     # logging.info("Server replied {}".format(kwargs))
 
-    for is_success, results in results_list:
-        if is_success:
-            yield map(traceroute2timetrack,results)
+    for resp in results_list:
+        if resp.ok:
+            # logging.info("Received {} traceroutes".format(len(resp.data)))
+            yield map(traceroute2timetrack, resp.data)
         else:
-            logging.error("All retries failed for {}".format(kwargs))
+            logging.error("All retries failed for {}".format(resp.url))
             # logging.warning("Atlas request failed for {}".format(kwargs))
             # if retry > 0:
                 # return get_results(param, retry-1)
