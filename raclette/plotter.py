@@ -143,7 +143,7 @@ class Plotter(object):
     def metric_over_time(self, startpoint, endpoint, metric="median", 
             filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", 
             ylim=None, geo_resolution=None, group = True, label=None, 
-            startpoint_label=None, endpoint_label=None, displayed_anomaly=3):
+            startpoint_label=None, endpoint_label=None, displayed_anomaly=-1):
         """Plot a metric (e.g. median, nbtracks, or nbpobes) for the given locations.
 
         Args:

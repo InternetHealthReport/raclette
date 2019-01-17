@@ -270,7 +270,10 @@ class TracksAggregator():
         for date, tracks in self.track_bins.items():
 
             if self.bins_last_insert[date]+1 < self.nb_cycles or force_expiration:
-                if force_expiration and not len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
+                if force_expiration and not (
+                        self.nb_expired_tracks == 0 or 
+                        len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins)
+                        ):
                     continue
                 else:
                     logging.debug("Force expiration for bin {}".format(date))
