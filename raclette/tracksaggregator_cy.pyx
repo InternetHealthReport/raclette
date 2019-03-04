@@ -136,6 +136,8 @@ class TracksAggregator():
 
         self.bins_last_insert[bin_id] = self.nb_cycles
 
+        return
+
 
     @cython.boundscheck(False) 
     def compute_median_diff_rtt(self, tracks):
@@ -270,10 +272,8 @@ class TracksAggregator():
         for date, tracks in self.track_bins.items():
 
             if self.bins_last_insert[date]+1 < self.nb_cycles or force_expiration:
-                if force_expiration and not (
-                        self.nb_expired_tracks == 0 or 
-                        len(tracks)>force_expiration*(self.nb_expired_tracks/self.nb_expired_bins)
-                        ):
+                if self.nb_expired_bins > 0 and force_expiration and  \
+                        len(tracks)<force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
                     continue
                 else:
                     logging.debug("Force expiration for bin {}".format(date))

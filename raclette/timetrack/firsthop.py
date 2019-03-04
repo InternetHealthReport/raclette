@@ -8,11 +8,10 @@ class TimeTrackConverter():
         self.i2a = ip2asn
 
     def traceroute2timetrack(self, trace):
-	"""Read a single traceroute result and get rtts for the first public hop
-	"""
+        """Read a single traceroute result and get rtts for the first public hop"""
 
         found_first_hop = False
-	if "prb_id" not in trace:
+        if "prb_id" not in trace:
             logging.warning("No probe ID given: %s" % trace)
             return None
 
@@ -20,7 +19,9 @@ class TimeTrackConverter():
         timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
                 "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
 
-	for hopNb, hop in enumerate(trace["result"]):
+        timetrack["rtts"].append( [timetrack["prb_id"], [0]] )
+
+        for hopNb, hop in enumerate(trace["result"]):
 
             if "result" in hop :
 
@@ -32,7 +33,7 @@ class TimeTrackConverter():
                     found_first_hop = True
                     if res["from"] != router_ip:
                         router_ip = res["from"]    
-                        router_asn = self.i2a.ip2asn(router_ip)
+                        router_asn = str(self.i2a.ip2asn(router_ip))
 
                     if len(timetrack["rtts"])==0 or timetrack["rtts"][-1][0] != router_asn:
                         timetrack["rtts"].append((router_asn,[]))
