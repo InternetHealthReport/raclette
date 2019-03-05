@@ -72,9 +72,10 @@ class TimeTrackConverter():
                     if res["from"] != router_ip:
                         router_ip = res["from"]    
                         router_asn = str(self.i2a.ip2asn(router_ip))
+                        location_str = "".join(["AS", str(router_asn), ip_space_str])
 
-                    if len(timetrack["rtts"])==0 or timetrack["rtts"][-1][0] != router_asn:
-                        timetrack["rtts"].append((router_asn,[]))
+                    if len(timetrack["rtts"])==0 or timetrack["rtts"][-1][0] != location_str:
+                        timetrack["rtts"].append((location_str,[]))
 
                     timetrack["rtts"][-1][1].append(res["rtt"])
 
