@@ -6,6 +6,16 @@ class TimeTrackConverter():
 
     def __init__(self, ip2asn):
         self.i2a = ip2asn
+        self.probe_info = {}
+
+        for probe in tools.get_probes_info():
+            try:
+                prb_id = str(probe["id"])
+                probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
+                self.probe_info[prb_id] = probe
+            except TypeError:
+                continue
+
 
     def traceroute2timetrack(self, trace):
         """Read a single traceroute result and get rtts for the first public hop"""
@@ -15,11 +25,39 @@ class TimeTrackConverter():
             logging.warning("No probe ID given: %s" % trace)
             return None
 
-        probe_asn = 0 # Not needed here, in theory first link stays in the same ASN
-        timetrack = {"prb_id": "PB"+str(trace["prb_id"]), "from_asn": probe_asn, 
-                "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], "rtts":[]}
+        asn_str = "asn_v"+str(trace["af"])
+        ip_space_str = "v"+str(trace["af"])
+        prb_id = str(trace["prb_id"])
+        prb_ip = trace.get("from", "")
 
-        timetrack["rtts"].append( [timetrack["prb_id"], [0]] )
+        try:
+            probe = self.probe_info[prb_id]
+            timetrack = {"prb_id": "PB"+prb_id, 
+                    "from_asn": "".join(["AS", str(probe[asn_str]),
+                        ip_space_str]),
+                "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                "rtts":[]}
+
+        except KeyError:
+            if prb_id not in self.probe_info:
+                probe = self.probe_info.setdefault(prb_id, {
+                    asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                            if prb_ip else "Unk PB"+prb_id,
+                    "location": "PB"+prb_id })
+                self.probe_info[prb_id] = probe
+            
+            elif asn_str not in probe:
+                probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                        if prb_ip else "Unk PB"+prb_id
+
+            timetrack = {"prb_id": "PB"+prb_id, 
+                    "from_asn": "".join(["AS", str(probe[asn_str]),
+                        ip_space_str]),
+                "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                "rtts":[]}
+
+
+        timetrack["rtts"].append( [probe["location"], [0]] )
 
         for hopNb, hop in enumerate(trace["result"]):
 
