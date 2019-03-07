@@ -61,13 +61,23 @@ class TimeTrackConverter():
 
         timetrack["rtts"].append( [probe["location"], [0]] )
 
+        prev_hop_rtt = None
+        curr_hop_rtt = [0]
         for hopNb, hop in enumerate(trace["result"]):
+
+            if len(curr_hop_rtt):
+                prev_hop_rtt = curr_hop_rtt
+                curr_hop_rtt = []
 
             if "result" in hop :
 
                 router_ip = ""
                 for res in hop["result"]:
-                    if not "from" in res  or tools.isPrivateIP(res["from"]) or not "rtt" in res or res["rtt"] <= 0.0:
+                    if not "from" in res   or not "rtt" in res or res["rtt"] <= 0.0:
+                        continue
+
+                    if tools.isPrivateIP(res["from"]):
+                        curr_hop_rtt.append(res["rtt"])
                         continue
 
                     found_first_hop = True
@@ -83,5 +93,10 @@ class TimeTrackConverter():
 
 
                 if found_first_hop:
+                    # Replace probes rtt by the previous hop RTT
+                    # That mean we will compute last mile delay only,
+                    # avoiding delay on the home/private network
+                    timetrack["rtts"][0][1] = prev_hop_rtt
+
                     return timetrack
 
