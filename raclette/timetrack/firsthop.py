@@ -1,6 +1,7 @@
 import logging
 import tools
 
+
 class TimeTrackConverter():
     """Convert traceroutes to time tracks for only the first public hop."""
 
@@ -11,7 +12,8 @@ class TimeTrackConverter():
         for probe in tools.get_probes_info():
             try:
                 prb_id = str(probe["id"])
-                probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
+                probe["location"] = "|".join(
+                        ["PB"+prb_id, probe["city"], "PF"+probe["prefix_v4"]])
                 self.probe_info[prb_id] = probe
             except TypeError:
                 continue
@@ -43,7 +45,7 @@ class TimeTrackConverter():
                 probe = self.probe_info.setdefault(prb_id, {
                     asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) \
                             if prb_ip else "Unk PB"+prb_id,
-                    "location": "PB"+prb_id })
+                    "location": "|".join("PB"+prb_id, "PF"+probe["prefix_v4"]) })
                 self.probe_info[prb_id] = probe
             
             elif asn_str not in probe:
@@ -59,13 +61,23 @@ class TimeTrackConverter():
 
         timetrack["rtts"].append( [probe["location"], [0]] )
 
+        prev_hop_rtt = None
+        curr_hop_rtt = [0]
         for hopNb, hop in enumerate(trace["result"]):
+
+            if len(curr_hop_rtt):
+                prev_hop_rtt = curr_hop_rtt
+                curr_hop_rtt = []
 
             if "result" in hop :
 
                 router_ip = ""
                 for res in hop["result"]:
-                    if not "from" in res  or tools.isPrivateIP(res["from"]) or not "rtt" in res or res["rtt"] <= 0.0:
+                    if not "from" in res   or not "rtt" in res or res["rtt"] <= 0.0:
+                        continue
+
+                    if tools.isPrivateIP(res["from"]):
+                        curr_hop_rtt.append(res["rtt"])
                         continue
 
                     found_first_hop = True
@@ -81,5 +93,10 @@ class TimeTrackConverter():
 
 
                 if found_first_hop:
+                    # Replace probes rtt by the previous hop RTT
+                    # That mean we will compute last mile delay only,
+                    # avoiding delay on the home/private network
+                    timetrack["rtts"][0][1] = prev_hop_rtt
+
                     return timetrack
 
