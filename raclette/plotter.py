@@ -375,6 +375,7 @@ if __name__ == "__main__":
     startpoint=sys.argv[2]
     endpoint=sys.argv[3]
     expid=1
+    title=None
     if len(sys.argv)>4:
         expid = int(sys.argv[4])
         print("Fetching results for expid={}".format(expid))
