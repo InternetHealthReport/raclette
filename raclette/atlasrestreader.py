@@ -36,7 +36,7 @@ def requests_retry_session(
     session.mount('https://', adapter)
     return session
 
-def worker_task(sess, resp):
+def worker_task(resp, *args, **kwargs):
     """Process json in background"""
     try:
         resp.data = resp.json()
@@ -47,21 +47,25 @@ def worker_task(sess, resp):
 
 def cousteau_on_steroid(params, retry=3):
     url = "https://atlas.ripe.net/api/v2/measurements/{0}/results"
-    req_param = {
-            "start": int(calendar.timegm(params["start"].timetuple())),
-            "stop": int(calendar.timegm(params["stop"].timetuple())),
-            }
-    
-    if params["probe_ids"]:
-        req_param["probe_ids"] = ",".join([str(i) for i in params["probe_ids"]])
-
     queries = []
+    probes = [None]
+
+    if params["probe_ids"]:
+        probes = [params["probe_ids"][x:x+50] for x in range(0, len(params["probe_ids"]), 50)]
 
     session = requests_retry_session()
     for msm in params["msm_id"]:
-        queries.append( session.get(url=url.format(msm), params=req_param,
-                        background_callback=worker_task
-            ) )
+        req_param = {
+                "start": int(calendar.timegm(params["start"].timetuple())),
+                "stop": int(calendar.timegm(params["stop"].timetuple())),
+                }
+        
+        for pb in probes:
+            if pb is not None:
+                req_param["probe_ids"] = ",".join([str(i) for i in pb])
+
+            queries.append( session.get(url=url.format(msm), params=req_param,
+                            hooks={ 'response': worker_task, }) )
 
     for query in queries:
         try:
