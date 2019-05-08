@@ -143,7 +143,8 @@ class Plotter(object):
     def metric_over_time(self, startpoint, endpoint, metric="median", 
             filename="{}_{}_{}_expid{}_diffrtt_time.pdf", expid=1, tz="UTC", 
             ylim=None, geo_resolution=None, group = True, label=None, 
-            startpoint_label=None, endpoint_label=None, displayed_anomaly=-1):
+            startpoint_label=None, endpoint_label=None, displayed_anomaly=-1,
+            title=None):
         """Plot a metric (e.g. median, nbtracks, or nbpobes) for the given locations.
 
         Args:
@@ -234,10 +235,13 @@ class Plotter(object):
                 plt.plot(data[metric], label=label)
                 # plt.plot(data["confhigh"], label=label)
                 # plt.plot(data["conflow"], label=label)
-                plt.title("{} to {} ({} probes)".format(
-                    location2str(locations[0]), 
-                    location2str(locations[1]), 
-                    nb_probes_per_geo[locations[0]]))
+                if title is None:
+                    plt.title("{} to {} ({} probes)".format(
+                        location2str(locations[0]), 
+                        location2str(locations[1]), 
+                        nb_probes_per_geo[locations[0]]))
+                else:
+                    plt.title(title)
 
             # Plot anomalous times
             if displayed_anomaly>=0:
@@ -267,7 +271,10 @@ class Plotter(object):
                 plt.savefig(fname)
 
         if group:
-            plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            if title is None:
+                plt.title("{} to {}".format(startpoint_label, endpoint_label))
+            else:
+                plt.title(title)
             fig.autofmt_xdate()
             plt.ylim(ylim)
             plt.tight_layout()
@@ -361,20 +368,23 @@ class Plotter(object):
 if __name__ == "__main__":
    
     if len(sys.argv)<4:
-        print("usage: {} db startpoint enpoint".format(sys.argv[0]) )
+        print("usage: {} db startpoint enpoint [expid [title]]".format(sys.argv[0]) )
         sys.exit()
 
     db = sys.argv[1]
     startpoint=sys.argv[2]
     endpoint=sys.argv[3]
     expid=1
+    title=None
     if len(sys.argv)>4:
         expid = int(sys.argv[4])
         print("Fetching results for expid={}".format(expid))
+    if len(sys.argv)>5:
+        title = sys.argv[5]
 
     pl = Plotter(db) 
 
-    pl.metric_over_time(startpoint, endpoint, expid=expid)
+    pl.metric_over_time(startpoint, endpoint, expid=expid, title=title)
     pl.metric_over_time(startpoint, endpoint, "nbtracks", expid=expid)
     pl.metric_over_time(startpoint, endpoint, "hop", expid=expid)
     pl.metric_over_time(startpoint, endpoint, "nbprobes", expid=expid)

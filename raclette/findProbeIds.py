@@ -1,5 +1,6 @@
 import json
 import argparse
+from datetime import datetime
 
 if __name__ == "__main__":
 
@@ -15,6 +16,7 @@ if __name__ == "__main__":
             help='Ignore anchors')
     parser.add_argument('--info', action="store_true", 
             help='Print all information for selected probes')
+    parser.add_argument('--year', nargs='+', type=int, help='Year of probe activity')
 
     args = parser.parse_args()
 
@@ -38,6 +40,15 @@ if __name__ == "__main__":
 
         if args.anchor is not None and probe["is_anchor"] != args.anchor:
             selected = False
+
+        if args.year is not None:
+            if probe['first_connected'] is None:
+                selected = False
+            else:
+                startdate = datetime.utcfromtimestamp(probe['first_connected'])
+                enddate = datetime.utcfromtimestamp(probe['last_connected'])
+                if startdate.year > max(args.year) or enddate.year < min(args.year): 
+                    selected = False
 
         if selected:
             if args.info:
