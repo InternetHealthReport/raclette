@@ -8,6 +8,7 @@ if __name__ == "__main__":
     parser.add_argument('--asns_v4', type=int, nargs='+', 
             help='IPv4 ASN of the probes')
     parser.add_argument('--city', nargs='+', help='City of the probes')
+    parser.add_argument('--country', nargs='+', help='Country code of the probes')
     parser.add_argument('--anchor', dest="anchor", action="store_true", 
             help='Select only anchors')
     parser.add_argument('--no-anchor', dest="anchor", action="store_false", 
@@ -32,11 +33,14 @@ if __name__ == "__main__":
         if args.city and probe["city"] not in args.city:
             selected = False
 
+        if args.country and probe["country_code"] not in args.country:
+            selected = False
+
         if args.anchor is not None and probe["is_anchor"] != args.anchor:
             selected = False
 
         if selected:
-            if args.info is None:
+            if args.info:
                 selected_probes.append(probe["id"])
             else:
                 selected_probes.append(probe)
