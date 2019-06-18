@@ -37,6 +37,7 @@ atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if 
 
 atlas_start =  tools.valid_date(config.get("io", "start"))
 atlas_stop =  tools.valid_date(config.get("io", "stop"))
+chunk_size = int(config.get('io', 'chunk_size'))
 
 topic = config.get("io", "kafka_topic")
 
@@ -63,7 +64,7 @@ def requests_retry_session(
     return session
 
 
-def worker_task(sess, resp):
+def worker_task(resp, *args, **kwargs):
     """Process json in background"""
     try:
         resp.data = resp.json()
@@ -87,7 +88,7 @@ def cousteau_on_steroid(params, retry=3):
     session = requests_retry_session()
     for msm in params["msm_id"]:
         queries.append( session.get(url=url.format(msm), params=req_param,
-                        background_callback=worker_task
+                hooks={ 'response': worker_task, }
             ) )
 
     for query in queries:
@@ -98,33 +99,14 @@ def cousteau_on_steroid(params, retry=3):
             logging.error("Could not retrieve traceroutes for {}".format(query))
 
 
-#if (len(sys.argv) == 1):
-#    print("One argument. Every Ten Minutes")
-#    #CollectionTime = datetime.datetime.utcnow()
-#    CollectionTime = datetime.datetime.utcnow()
-##    while True:
-#        params = { "msm_id": [1748022, 1748024, 11645084, 11645087, 2244316, 2244318, 2244318, 2435592, 2435594, 1796567, 1796569], "start": (CollectionTime - timedelta(minutes=20)), "stop": (CollectionTime - timedelta(minutes=10)), "probe_ids": [] }
-#        for is_success, data in cousteau_on_steroid(params):
-#            print("downloading")
-#
-#            if is_success:
-#                for traceroute in data:
-#                    producer.send('TURBO_TIME_TEST4', value=traceroute, timestamp_ms = traceroute.get('timestamp'))
-##            else:
-#                print("Error could not load the data")
-#        CollectionTime = CollectionTime + timedelta(minutes = 10)
-#        time.sleep(600)
 if (len(sys.argv) >= 3):
     print("3 Arguments.  Using Start and End Time")
-    CollectionTime = atlas_start
-    StopTime = atlas_stop
-    #CollectionTime = datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d-%H:%M") Input times in command line version
-    #StopTime = datetime.datetime.strptime(sys.argv[2],"%Y-%m-%d-%H:%M")
-    while CollectionTime < StopTime:
-        #params = { "msm_id": [1748022, 1748024, 11645084, 11645087, 2244316, 2244318, 2244318, 2435592, 2435594, 1796567, 1796569], "start": (CollectionTime - timedelta(minutes=20)), "stop": (CollectionTime - timedelta(minutes=10)), "probe_ids": [] } old msm id version
-        params = { "msm_id": atlas_msm_ids, "start": (CollectionTime - timedelta(minutes=20)), "stop": (CollectionTime - timedelta(minutes=10)), "probe_ids": atlas_probe_ids }
-        for is_success, data in cousteau_on_steroid(params):
+    current_time = atlas_start
+    end_time = atlas_stop
+    while current_time < end_time:
+        params = { "msm_id": atlas_msm_ids, "start": current_time, "stop": current_time  + timedelta(seconds=chunk_size), "probe_ids": atlas_probe_ids }
 
+        for is_success, data in cousteau_on_steroid(params):
             print("downloading")
             if is_success:
                 for traceroute in data:
@@ -133,6 +115,6 @@ if (len(sys.argv) >= 3):
             else:
                 print("Error could not load the data")
 
-        CollectionTime = CollectionTime + timedelta(minutes = 10)
+        current_time = current_time + timedelta(seconds = chunk_size)
 else:
     print("Improper argument use.  Need either none or exactly 2, first start time, then end time")
