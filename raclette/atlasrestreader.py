@@ -103,7 +103,7 @@ def get_results(param, retry=3):
 class Reader():
 
     def __init__(self, start, end, timetrack_converter, msm_ids=[5001,5004,5005], 
-            probe_ids=[1,2,3,4,5,6,7,8], chunk_size=900):
+            probe_ids=[1,2,3,4,5,6,7,8], chunk_size=900, config=None):
 
 
         self.pool = None
@@ -161,10 +161,4 @@ class Reader():
             self.pool.shutdown()
         self.bar.finish()
         return False
-
-
-if __name__ == "__main__":
-    with AtlasRestReader(datetime.datetime(2018,6,1,0,0), datetime.datetime(2018,6,2,0,0)) as arr:
-            for tr in arr:
-                print(tr)
 
