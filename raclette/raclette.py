@@ -160,7 +160,7 @@ class Raclette():
             try:
                 reader_module = importlib.import_module(self.reader)
                 tr_reader = reader_module.Reader(self.atlas_start, self.atlas_stop, timetrackconverter, 
-                    self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size) 
+                    self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size, config=self.config) 
             # tr_reader  = DumpReader(dump_name, dump_filter)
             except ImportError:
                 logging.error("Reader unknown! ({})".format(self.reader))
