@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 #IMPORT KAFKA PRODUCER
 from kafka import KafkaProducer
-producer = KafkaProducer(bootstrap_servers=['Kafka1:9092', 'Kafka2:9092'],
+producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
                          value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 #end import
@@ -38,9 +38,8 @@ atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if 
 atlas_start =  tools.valid_date(config.get("io", "start"))
 atlas_stop =  tools.valid_date(config.get("io", "stop"))
 
-
-
 topic = config.get("io", "kafka_topic")
+
 
 def requests_retry_session(
     retries=3,
@@ -62,6 +61,7 @@ def requests_retry_session(
     session.mount('http://', adapter)
     session.mount('https://', adapter)
     return session
+
 
 def worker_task(sess, resp):
     """Process json in background"""

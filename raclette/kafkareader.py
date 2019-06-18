@@ -28,7 +28,7 @@ class Reader():
                 group_id='raclette_traceroute_reader',
                 consumer_timeout_ms=10000)
 
-        self.consumer.subscribe(self.config.get('io', 'topic'))
+        self.consumer.subscribe(self.config.get('io', 'kafka_topic'))
         return self
 
     def __exit__(self, type, value, traceback):
