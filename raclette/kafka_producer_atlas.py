@@ -16,7 +16,9 @@ from requests.packages.urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
 
 #IMPORT KAFKA PRODUCER
-from kafka import KafkaProducer
+from kafka import KafkaProducer #, KafkaAdminClient, NewTopic
+from kafka.admin import KafkaAdminClient, NewTopic
+
 
 def requests_retry_session(
     retries=3,
@@ -99,6 +101,10 @@ if __name__ == '__main__':
     chunk_size = int(config.get('io', 'chunk_size'))
 
     topic = config.get("io", "kafka_topic")
+    admin_client = KafkaAdminClient(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'], client_id='atlas_producer_admin')
+
+    topic_list = [NewTopic(name=topic, num_partitions=1, replication_factor=1)]
+    admin_client.create_topics(new_topics=topic_list, validate_only=False)
 
     current_time = atlas_start
     end_time = atlas_stop
