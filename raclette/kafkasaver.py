@@ -38,7 +38,6 @@ class Saver(multiprocessing.Process):
                     main_running = False
             else:
                 self.save(elem)
-            # self.saver_queue.task_done()
 
     def createdb(self):
         logging.info("Creating databases")
@@ -109,7 +108,9 @@ class Saver(multiprocessing.Process):
                         nb_tracks, nb_probes, entropy, hop, nbrealrtts,
                         self.expid) )
                         
-            self.producer.send('SQLTEST4', value = serialized_data)
+            self.producer.send('raclette_results', value = serialized_data, 
+                    timestamp_ms=ts, acks=0, buffer_memory=256*1024*1024)
+
             if self.prevts != ts:
                 self.prevts = ts
                 logging.info("start recording diff. RTTs (ts={})".format(ts))

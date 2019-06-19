@@ -23,8 +23,9 @@ class Reader():
     def __enter__(self):
         self.consumer = KafkaConsumer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                auto_offset_reset='latest',
+                auto_offset_reset='earliest',
                 value_deserializer=lambda m: json.loads(m),
+                client_id='raclette_traceroute_reader',
                 group_id='raclette_traceroute_reader',
                 consumer_timeout_ms=10000)
 
@@ -32,15 +33,13 @@ class Reader():
         return self
 
     def __exit__(self, type, value, traceback):
-        self.close()
+        pass
 
     def read(self):
-        logging.info("Entering Infinite For")
+        logging.info("Start consuming data")
         for message in self.consumer:
+            #FIXME: the consumer is not filtering by msm or probe id
             traceroute = message.value
             yield self.timetrack_converter.traceroute2timetrack(traceroute)
         self.consumer.close()
-        logging.info("should be closed")
-
-    def close(self):
-        return False
+        logging.info("closed the consumer")
