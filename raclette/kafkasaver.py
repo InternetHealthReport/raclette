@@ -39,6 +39,8 @@ class Saver(multiprocessing.Process):
             else:
                 self.save(elem)
 
+        self.producer.flush()
+
     def createdb(self):
         logging.info("Creating databases")
         # Table storing experiements parameters
