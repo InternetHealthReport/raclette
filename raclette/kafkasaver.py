@@ -24,8 +24,10 @@ class Saver(multiprocessing.Process):
 
         logging.info("Started saver")
         self.createdb()
-        self.producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                                         value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+        self.producer = KafkaProducer(
+                bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                acks=0, buffer_memory=256*1024*1024)
 
         main_running = True
 
@@ -111,7 +113,7 @@ class Saver(multiprocessing.Process):
                         self.expid) )
                         
             self.producer.send('raclette_results', value = serialized_data, 
-                    timestamp_ms=ts, acks=0, buffer_memory=256*1024*1024)
+                    timestamp_ms=ts)
 
             if self.prevts != ts:
                 self.prevts = ts
