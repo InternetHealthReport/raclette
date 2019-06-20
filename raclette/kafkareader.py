@@ -24,9 +24,10 @@ class Reader():
         self.consumer = KafkaConsumer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
                 # auto_offset_reset='earliest',
-                value_deserializer=lambda m: json.loads(m),
-                group_id='raclette_traceroute_reader1000',
-                consumer_timeout_ms=10000)
+                value_deserializer=json.loads,
+                group_id='ihr_raclette_traceroute_reader',
+                # consumer_timeout_ms=10000
+                )
 
         self.consumer.subscribe(self.config.get('io', 'kafka_topic'))
         return self
