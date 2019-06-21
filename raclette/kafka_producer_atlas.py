@@ -103,7 +103,7 @@ if __name__ == '__main__':
     admin_client = KafkaAdminClient(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'], client_id='atlas_producer_admin')
 
     try:
-        topic_list = [NewTopic(name=topic, num_partitions=1, replication_factor=1)]
+        topic_list = [NewTopic(name=topic, num_partitions=6, replication_factor=1)]
         admin_client.create_topics(new_topics=topic_list, validate_only=False)
     except:
         pass
