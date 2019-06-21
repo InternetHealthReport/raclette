@@ -24,7 +24,7 @@ def requests_retry_session(
     backoff_factor=0.3,
     status_forcelist=(500, 502, 504),
     session=None,
-    max_workers=10,
+    max_workers=8,
 ):
     """ Retry if there is a problem"""
     session = session or FuturesSession(max_workers=max_workers)

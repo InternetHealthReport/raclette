@@ -39,8 +39,6 @@ class Reader():
         logging.info("Start consuming data")
         for message in self.consumer:
             #FIXME: the consumer is not filtering by msm or probe id
-            traceroute = message.value
-            print(traceroute)
-            yield self.timetrack_converter.traceroute2timetrack(traceroute)
+            yield self.timetrack_converter.traceroute2timetrack(message.value)
         self.consumer.close()
         logging.info("closed the consumer")
