@@ -1,6 +1,6 @@
 import multiprocessing
 import logging
-import json
+import msgpack
 from kafka import KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import TopicAlreadyExistsError
@@ -23,7 +23,7 @@ class Saver(multiprocessing.Process):
         logging.info("Started saver")
         self.producer = KafkaProducer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                value_serializer=lambda v: msgpack.dumps,
                 )
 
         try:
