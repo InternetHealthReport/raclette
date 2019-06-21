@@ -13,7 +13,6 @@ from datetime import timedelta
 from requests_futures.sessions import FuturesSession
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from multiprocessing import Pool
 
 #IMPORT KAFKA PRODUCER
 from kafka import KafkaProducer #, KafkaAdminClient, NewTopic
@@ -25,7 +24,7 @@ def requests_retry_session(
     backoff_factor=0.3,
     status_forcelist=(500, 502, 504),
     session=None,
-    max_workers=4,
+    max_workers=10,
 ):
     """ Retry if there is a problem"""
     session = session or FuturesSession(max_workers=max_workers)
@@ -109,26 +108,19 @@ if __name__ == '__main__':
     except:
         pass
 
-    pool_size = 10
-    pool = Pool(max_workers=pool_size) 
-
     current_time = atlas_start
     end_time = atlas_stop
     while current_time < end_time:
-        print("downloading: ", current_time)
-        params = []
-        for some_msms in np.array.split(atlas_msm_ids, len(atlas_msm_ids)/pool_size):
-            params.append({ "msm_id": some_msms, "start": current_time, "stop": current_time  + timedelta(seconds=chunk_size), "probe_ids": atlas_probe_ids })
+        logging.warning("downloading: "+str(current_time))
+        params = { "msm_id": atlas_msm_ids, "start": current_time, "stop": current_time  + timedelta(seconds=chunk_size), "probe_ids": atlas_probe_ids }
         
-        msm_results = pool.map(cousteau_on_steroid, params)
-        for res in msm_results:
-            for is_success, data in cousteau_on_steroid(params):
-                if is_success:
-                    for traceroute in data:
-                        producer.send(topic, value=traceroute, timestamp_ms = traceroute.get('timestamp'))
-                else:
-                    print("Error could not load the data")
+        for is_success, data in cousteau_on_steroid(params):
+            if is_success:
+                for traceroute in data:
+                    producer.send(topic, value=traceroute, timestamp_ms = traceroute.get('timestamp'))
+            else:
+                print("Error could not load the data")
 
-                producer.flush()
+            producer.flush()
 
         current_time = current_time + timedelta(seconds = chunk_size)
