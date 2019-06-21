@@ -1,4 +1,4 @@
-import json
+import msgpack
 import logging
 from kafka import KafkaConsumer
 
@@ -23,9 +23,9 @@ class Reader():
     def __enter__(self):
         self.consumer = KafkaConsumer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                auto_offset_reset='earliest',
-                value_deserializer=lambda v: json.loads(v.decode('utf8')),
-                # group_id='ihr_raclette_traceroute_reader',
+                # auto_offset_reset='earliest',
+                value_deserializer=msgpack.loads,
+                group_id='ihr_raclette_traceroute_reader',
                 # consumer_timeout_ms=10000
                 )
 
