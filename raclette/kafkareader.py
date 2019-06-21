@@ -27,6 +27,7 @@ class Reader():
                 value_deserializer=lambda v: msgpack.unpackb(v, raw=False),
                 group_id='ihr_raclette_traceroute_reader',
                 # consumer_timeout_ms=10000
+                max_poll_interval_ms=self.chunk_size*1000,
                 )
 
         self.consumer.subscribe(self.config.get('io', 'kafka_topic'))
