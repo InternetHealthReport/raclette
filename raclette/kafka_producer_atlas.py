@@ -122,5 +122,6 @@ if __name__ == '__main__':
             else:
                 print("Error could not load the data")
 
-        producer.flush()
+            producer.flush()
+
         current_time = current_time + timedelta(seconds = chunk_size)
