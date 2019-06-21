@@ -1,7 +1,7 @@
 import json
-import datetime
 import calendar
 import json
+import msgpack
 import logging
 import time
 import requests
@@ -80,7 +80,7 @@ def cousteau_on_steroid(params, retry=3):
 
 if __name__ == '__main__':
     producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                            value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+                            value_serializer=msgpack.dumps)
 
     #end import
     logging.basicConfig()#should be removable soon
