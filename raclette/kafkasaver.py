@@ -23,7 +23,7 @@ class Saver(multiprocessing.Process):
         logging.info("Started saver")
         self.producer = KafkaProducer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                value_serializer=lambda v: msgpack.dumps,
+                value_serializer=lambda v: msgpack.packb(v, use_bin_type=True),
                 )
 
         try:

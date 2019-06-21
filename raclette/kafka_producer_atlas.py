@@ -79,7 +79,7 @@ def cousteau_on_steroid(params, retry=3):
 
 if __name__ == '__main__':
     producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                            value_serializer=msgpack.dumps)
+            value_serializer=lambda v: msgpack.packb(v, use_bin_type=True))
 
     #end import
     logging.basicConfig()#should be removable soon
