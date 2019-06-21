@@ -15,7 +15,7 @@ class Saver(multiprocessing.Process):
         self.saver_queue = saver_queue
         self.expid = None
         self.prevts = -1
-        self.topic = 'ihr_raclette_results'
+        self.topic = 'ihr_raclette_diffrtt'
         logging.warn("End init saver")
 
     def run(self):
