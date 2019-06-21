@@ -39,7 +39,12 @@ class Reader():
     def read(self):
         logging.info("Start consuming data")
         for message in self.consumer:
-            #FIXME: the consumer is not filtering by msm or probe id
-            yield self.timetrack_converter.traceroute2timetrack(message.value)
+            traceroute = message.value
+            #needed? the consumer is not filtering by msm or probe id
+            # if (self.probe_ids is not None and traceroute['prb_id'] not in self.probe_ids) or \
+                    # (self.msm_ids is not None and traceroute['msm_id'] not in self.msm_ids):
+                        # pass
+
+            yield self.timetrack_converter.traceroute2timetrack(traceroute)
         self.consumer.close()
         logging.info("closed the consumer")
