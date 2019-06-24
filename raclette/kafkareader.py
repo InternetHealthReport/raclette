@@ -23,11 +23,12 @@ class Reader():
     def __enter__(self):
         self.consumer = KafkaConsumer(
                 bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                # auto_offset_reset='earliest',
+                auto_offset_reset='earliest',
                 value_deserializer=lambda v: msgpack.unpackb(v, raw=False),
-                group_id='ihr_raclette_traceroute_reader',
+                # group_id='ihr_raclette_traceroute_reader',
                 # consumer_timeout_ms=10000
-                max_poll_interval_ms=self.chunk_size*1000,
+                session_timeout_ms=self.chunk_size*1000,
+                max_partition_fetch_bytes=64*1024,
                 )
 
         self.consumer.subscribe(self.config.get('io', 'kafka_topic'))
