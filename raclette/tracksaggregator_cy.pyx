@@ -7,7 +7,7 @@ import traceback
 import logging
 import numpy as np
 import statsmodels.api as sm
-from collections import defaultdict 
+from collections import defaultdict
 from itertools import combinations, product
 import tools
 
@@ -21,8 +21,8 @@ from libc.stdlib cimport malloc, free
 from cython.parallel import prange
 cimport cython
 
-@cython.boundscheck(False) 
-@cython.nonecheck(False) 
+@cython.boundscheck(False)
+@cython.nonecheck(False)
 def enumerate_loc_diffrtt(nb_hops, track_rtts):
     """Enumerate over all locations and compute diffrtt"""
 
@@ -34,17 +34,17 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
     for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in \
             zip(nb_hops, combinations(track_rtts,2)):
         # double for loops are faster than itertools.product
-        # diffrtt =  [ x1-x0 for x0, x1 in product(rtts0,rtts1)] 
-        diffrtt =  [ x1-x0 for x0 in rtts0 for x1 in rtts1] 
+        # diffrtt =  [ x1-x0 for x0, x1 in product(rtts0,rtts1)]
+        diffrtt =  [ x1-x0 for x0 in rtts0 for x1 in rtts1]
 
-        [(yield (hop, diffrtt, (loc0, loc1))) 
-                for loc0 in loc_set0.split("|") 
+        [(yield (hop, diffrtt, (loc0, loc1)))
+                for loc0 in loc_set0.split("|")
                 for loc1 in loc_set1.split("|") if loc0!=loc1]
 
 
-@cython.boundscheck(False) 
+@cython.boundscheck(False)
 cdef double normalized_entropy(long *count, int nbelem) nogil:
-    """ Computes normalized entropy of the given distribution. Does not copy 
+    """ Computes normalized entropy of the given distribution. Does not copy
     the input data.  Slightly faster than scipy implementation for small lists.
     """
 
@@ -79,7 +79,7 @@ cdef double normalized_entropy(long *count, int nbelem) nogil:
 
 class TracksAggregator():
     """
-    Sort tracks based on their timestamp and compute minimum and median 
+    Sort tracks based on their timestamp and compute minimum and median
     differential RTT for each time bin.
     """
 
@@ -90,13 +90,10 @@ class TracksAggregator():
         self.nb_ignored_tracks = 0
         self.nb_empty_tracks = 0
         self.track_bins = {}
-        self.bins_last_insert= defaultdict(int)
+        self.msm_bin = defaultdict(int)
         self.nb_expired_bins = 0
         self.nb_expired_tracks = 0
         self.nb_hops_cache = {}
-        self.prev_msmid = 0
-        self.last_cycle_msmid = set()
-        self.nb_cycles = 0
 
 
     def add_track(self, track):
@@ -110,7 +107,10 @@ class TracksAggregator():
             return
 
         bin_id = int(ts/win_size)
-        if self.bins_last_insert[bin_id] is None:
+
+        if self.msm_bin[track['msm_id']] > bin_id \
+                and bin_id not in self.track_bins:
+            # Belong to expired bins
             self.nb_ignored_tracks += 1
             return
 
@@ -120,30 +120,19 @@ class TracksAggregator():
         except KeyError:
             self.track_bins[bin_id] = [track]
 
-        # Track cycles to sense completed bins
-        if self.prev_msmid != track["msm_id"]:
-            # Get results from another measurement
-            self.prev_msmid = track["msm_id"]
-            nb_msm = len(self.last_cycle_msmid)
-            self.last_cycle_msmid.add(track["msm_id"])
-            
-            if nb_msm == len(self.last_cycle_msmid):
-                # Completed one cycle
-                self.nb_cycles += 1
-                self.last_cycle_msmid = set() 
-                self.bins_last_insert[bin_id] = self.nb_cycles
-                return self.aggregate()
-
-        self.bins_last_insert[bin_id] = self.nb_cycles
+        # new bin: can we process the previous bins?
+        if self.msm_bin[track['msm_id']] < track["msm_id"]:
+            self.msm_bin[track['msm_id']] = track['msm_id']
+            return self.aggregate()
 
         return
 
 
-    @cython.boundscheck(False) 
+    @cython.boundscheck(False)
     def compute_median_diff_rtt(self, tracks):
         """Compute several statistics from the set of given tracks.
-        The returned dictionnary provides for each pair of locations found in 
-        the tracks, the differential median RTT, minimum, entropy of 
+        The returned dictionnary provides for each pair of locations found in
+        the tracks, the differential median RTT, minimum, entropy of
         probes ASN, number of diff. RTT samples, number of unique probes."""
 
         cdef int nbsamples
@@ -154,7 +143,7 @@ class TracksAggregator():
 
         results = {}
         counters = defaultdict(lambda: {
-            "diffrtt": [], 
+            "diffrtt": [],
             "unique_probes": set(),
             "nb_tracks_per_asn": defaultdict(int),
             "nb_tracks": 0,
@@ -173,14 +162,14 @@ class TracksAggregator():
             try:
                 nb_hops = nb_hops_cache[nblocations]
             except KeyError:
-                nb_hops = [hopnb for i in range(nblocations-1,0,-1) 
+                nb_hops = [hopnb for i in range(nblocations-1,0,-1)
                         for hopnb in range(1,i+1)]
                 self.nb_hops_cache[nblocations] = nb_hops
 
             for hop, diffrtt, locations in \
-                enumerate_loc_diffrtt(nb_hops, track["rtts"]): 
+                enumerate_loc_diffrtt(nb_hops, track["rtts"]):
                     count = counters[locations]
-                    count["diffrtt"] += diffrtt 
+                    count["diffrtt"] += diffrtt
                     count["nb_tracks_per_asn"][from_asn] += 1
                     count["unique_probes"].add(prb_id)
                     count["nb_tracks"] += 1
@@ -199,18 +188,18 @@ class TracksAggregator():
             count["diffrtt"] = np.asarray(count["diffrtt"])
 
         nblocations = len(counters.values())
-        cdef double * *array_diffrtt =  <double**> PyMem_Malloc( 
+        cdef double * *array_diffrtt =  <double**> PyMem_Malloc(
                 nblocations * 2 * sizeof(double*))
-        cdef long * *array_entropy =  <long **> PyMem_Malloc( 
+        cdef long * *array_entropy =  <long **> PyMem_Malloc(
                 nblocations * sizeof(long*))
-        cdef int * array_entropy_size =  <int *> PyMem_Malloc( 
+        cdef int * array_entropy_size =  <int *> PyMem_Malloc(
                 nblocations * sizeof(int))
-        cdef double *entropy_values =  <double *> PyMem_Malloc( 
+        cdef double *entropy_values =  <double *> PyMem_Malloc(
                 nblocations * sizeof(double))
         cdef double [:] tmp_array
         cdef long [:] tmp_ent
         cdef int loc_idx
-        
+
         for loc_idx, x in enumerate(counters.values()):
             tmp_array = x["diffrtt"]
             array_diffrtt[loc_idx*2] = &tmp_array[0]
@@ -223,7 +212,7 @@ class TracksAggregator():
         for loc_idx in prange(nblocations, nogil=True):
             cpp_sort(array_diffrtt[loc_idx*2], array_diffrtt[loc_idx*2+1])
             entropy_values[loc_idx] = normalized_entropy(
-                    array_entropy[loc_idx], array_entropy_size[loc_idx]) 
+                    array_entropy[loc_idx], array_entropy_size[loc_idx])
 
         PyMem_Free(array_diffrtt)
         PyMem_Free(array_entropy)
@@ -233,7 +222,7 @@ class TracksAggregator():
         for loc_idx, (locations, count) in enumerate(counters.items()):
             if count["nb_tracks"]<min_tracks:
                 continue
-            
+
             diff_rtt_values = count["diffrtt"]
             nbsamples = diff_rtt_values.shape[0]
             # these 2 steps are precomuped in parallel before this loop
@@ -260,18 +249,19 @@ class TracksAggregator():
 
 
     def aggregate(self, force_expiration=0):
-        """Find expired track bins, that is bins that are not affected by the 
-        last n track insertions (n=self.expiration). And compute median 
+        """Find expired track bins, that is bins that are not affected by the
+        last n track insertions (n=self.expiration). And compute median
         differential RTTs, number of sample, etc.. for expired bins. """
 
-        results = {} 
+        results = {}
 
         logging.debug("Running results collection")
         expired_bins = []
+        min_processed_bin = min(msm_bin.values())
 
         for date, tracks in self.track_bins.items():
 
-            if self.bins_last_insert[date]+1 < self.nb_cycles or force_expiration:
+            if min_processed_bin > date or force_expiration:
                 if self.nb_expired_bins > 0 and force_expiration and  \
                         len(tracks)<force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
                     continue
@@ -287,9 +277,8 @@ class TracksAggregator():
                 self.nb_expired_bins += 1
                 logging.info("Finished processing bin {}".format(date))
 
-        # remember expired dates and delete corresponding bins
+        # delete corresponding bins
         for date in expired_bins:
-            self.bins_last_insert[date] = None 
             del self.track_bins[date]
 
         return results
