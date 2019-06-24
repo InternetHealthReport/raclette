@@ -257,7 +257,7 @@ class TracksAggregator():
 
         logging.debug("Running results collection")
         expired_bins = []
-        min_processed_bin = min(msm_bin.values())
+        min_processed_bin = min(self.msm_bin.values())
 
         for date, tracks in self.track_bins.items():
 
