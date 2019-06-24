@@ -216,13 +216,13 @@ class Plotter(object):
         logging.warning("The two selected locations are on average {} hops away".format(nbhops))
 
         if group:
-            fig = plt.figure(figsize=(6,3))
+            fig = plt.figure(figsize=(7,3))
 
         for locations, data in diffrtt_grp:
             if data["nbtracks"].mean()<nbtracks_avg/2.0:
                 continue
             if not group :
-                fig = plt.figure(figsize=(6,3))
+                fig = plt.figure(figsize=(7,3))
             # Ignore locations with a small number of samples
             if group:
                 x_label = "{} to {}".format(
@@ -254,7 +254,7 @@ class Plotter(object):
         
             plt.gca().xaxis_date(tz)
             if metric == "median":
-                plt.ylabel("diff. RTT (ms)")
+                plt.ylabel("RTT (ms)")
             else:
                 plt.ylabel(metric)
 
