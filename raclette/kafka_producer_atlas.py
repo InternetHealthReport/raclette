@@ -80,7 +80,7 @@ def cousteau_on_steroid(params, retry=3):
 if __name__ == '__main__':
     producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
             value_serializer=lambda v: msgpack.packb(v, use_bin_type=True),
-            compression_type='snappy')
+            compression_type='snappy', linger_ms=1000, max_in_flight_requests_per_connection=10)
 
     #end import
     logging.basicConfig()#should be removable soon
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     admin_client = KafkaAdminClient(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'], client_id='atlas_producer_admin')
 
     try:
-        topic_list = [NewTopic(name=topic, num_partitions=6, replication_factor=1)]
+        topic_list = [NewTopic(name=topic, num_partitions=6, replication_factor=0)]
         admin_client.create_topics(new_topics=topic_list, validate_only=False)
     except:
         pass
