@@ -121,8 +121,8 @@ class TracksAggregator():
             self.track_bins[bin_id] = [track]
 
         # new bin: can we process the previous bins?
-        if self.msm_bin[track['msm_id']] < track["msm_id"]:
-            self.msm_bin[track['msm_id']] = track['msm_id']
+        if self.msm_bin[track['msm_id']] < bin_id:
+            self.msm_bin[track['msm_id']] = bin_id
             return self.aggregate()
 
         return
