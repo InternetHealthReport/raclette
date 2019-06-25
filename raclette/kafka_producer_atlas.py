@@ -125,7 +125,8 @@ if __name__ == '__main__':
                             print(traceroute)
                             traceroute['timestamp'] = traceroute['stored_timestamp']
 
-                        producer.send(topic, key=traceroute['msm_id'], value=traceroute, timestamp_ms = traceroute.get('timestamp'))
+                        producer.send(topic, key=traceroute['msm_id'], 
+                                value=traceroute) #, timestamp_ms = traceroute.get('timestamp')*1000)
                     except KeyError:
                         logging.warning('Ignoring one traceroute: {}'.format(traceroute))
             else:

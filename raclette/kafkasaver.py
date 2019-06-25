@@ -69,7 +69,7 @@ class Saver(multiprocessing.Process):
                 }
 
             self.producer.send(self.topic, value = serialized_data,
-                    timestamp_ms=int(ts))
+                    timestamp_ms=int(ts)*1000)
 
             if self.prevts != ts:
                 self.prevts = ts
