@@ -80,7 +80,8 @@ def cousteau_on_steroid(params, retry=3):
 if __name__ == '__main__':
     producer = KafkaProducer(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
             value_serializer=lambda v: msgpack.packb(v, use_bin_type=True),
-            compression_type='snappy', linger_ms=1000, max_in_flight_requests_per_connection=10)
+            key_serializer=lambda k: k.to_bytes(8, byteorder='big'),
+            compression_type='snappy', linger_ms=1000) 
 
     #end import
     logging.basicConfig()#should be removable soon
@@ -118,7 +119,15 @@ if __name__ == '__main__':
         for is_success, data in cousteau_on_steroid(params):
             if is_success:
                 for traceroute in data:
-                    producer.send(topic, value=traceroute, timestamp_ms = traceroute.get('timestamp'))
+                    try:
+                        if traceroute['timestamp'] > traceroute['stored_timestamp']:
+                            # Correct timestamp that are in the future
+                            print(traceroute)
+                            traceroute['timestamp'] = traceroute['stored_timestamp']
+
+                        producer.send(topic, key=traceroute['msm_id'], value=traceroute, timestamp_ms = traceroute.get('timestamp'))
+                    except KeyError:
+                        logging.warning('Ignoring one traceroute: {}'.format(traceroute))
             else:
                 print("Error could not load the data")
 
