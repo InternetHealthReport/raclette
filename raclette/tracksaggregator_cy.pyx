@@ -261,7 +261,7 @@ class TracksAggregator():
 
         for date, tracks in self.track_bins.items():
 
-            if min_processed_bin > date+1 or force_expiration:
+            if min_processed_bin > date or force_expiration:
                 if self.nb_expired_bins > 0 and force_expiration and  \
                         len(tracks)<force_expiration*(self.nb_expired_tracks/self.nb_expired_bins):
                     continue
