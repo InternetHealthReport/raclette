@@ -56,4 +56,5 @@ if __name__ == "__main__":
             else:
                 selected_probes.append(probe)
 
-    print(selected_probes)
+
+    print(json.dumps(selected_probes, indent=4))
