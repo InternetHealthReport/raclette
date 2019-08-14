@@ -1,6 +1,8 @@
 import msgpack
 import logging
-from kafka import KafkaConsumer
+from confluent_kafka import Consumer, KafkaError
+
+
 
 
 class Reader():
@@ -21,18 +23,15 @@ class Reader():
         self.config = config
 
     def __enter__(self):
-        self.consumer = KafkaConsumer(
-                bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                # auto_offset_reset='earliest',
-                value_deserializer=lambda v: msgpack.unpackb(v, raw=False),
-                group_id='ihr_raclette_traceroute_reader0',
-                # consumer_timeout_ms=10000
-                session_timeout_ms=1800*1000,
-                # request_timeout_ms=510*1000,
-                # connections_max_idle_ms=540*1000,
-                )
+        self.consumer = Consumer({
+            'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
+            'group.id': 'ihr_raclette_traceroute_reader0',
+            'auto.offset.reset': 'earliest',
+            'session.timeout.ms'=1800*1000,
+        })
 
-        self.consumer.subscribe(self.config.get('io', 'kafka_topic'))
+        self.consumer.subscribe([self.config.get('io', 'kafka_topic')])
+
         return self
 
     def __exit__(self, type, value, traceback):
@@ -40,13 +39,24 @@ class Reader():
 
     def read(self):
         logging.info("Start consuming data")
-        for message in self.consumer:
-            traceroute = message.value
+        while True:
+            msg = c.poll(1.0)
+
+            if msg is None:
+                continue
+            if msg.error():
+                logging.error("Consumer error: {}".format(msg.error()))
+                continue
+
+            print('Received message: {}'.format(msg.value().decode('utf-8')))
+            traceroute = msgpack.unpackb(msg.value(), raw=False)
+
             #needed? the consumer is not filtering by msm or probe id
             # if (self.probe_ids is not None and traceroute['prb_id'] not in self.probe_ids) or \
                     # (self.msm_ids is not None and traceroute['msm_id'] not in self.msm_ids):
                         # pass
 
             yield self.timetrack_converter.traceroute2timetrack(traceroute)
+
         self.consumer.close()
         logging.info("closed the consumer")

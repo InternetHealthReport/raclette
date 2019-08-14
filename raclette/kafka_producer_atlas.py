@@ -105,7 +105,7 @@ if __name__ == '__main__':
     admin_client = KafkaAdminClient(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'], client_id='atlas_producer_admin')
 
     try:
-        topic_list = [NewTopic(name=topic, num_partitions=6, replication_factor=0)]
+        topic_list = [NewTopic(name=topic, num_partitions=3, replication_factor=0)]
         admin_client.create_topics(new_topics=topic_list, validate_only=False)
     except:
         pass
@@ -120,13 +120,8 @@ if __name__ == '__main__':
             if is_success:
                 for traceroute in data:
                     try:
-                        if traceroute['timestamp'] > traceroute['stored_timestamp']:
-                            # Correct timestamp that are in the future
-                            print(traceroute)
-                            traceroute['timestamp'] = traceroute['stored_timestamp']
-
                         producer.send(topic, key=traceroute['msm_id'], 
-                                value=traceroute) #, timestamp_ms = traceroute.get('timestamp')*1000)
+                                value=traceroute, timestamp_ms = traceroute.get('timestamp')*1000)
                     except KeyError:
                         logging.warning('Ignoring one traceroute: {}'.format(traceroute))
             else:
