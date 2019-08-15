@@ -27,7 +27,8 @@ class Reader():
             'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
             'group.id': 'ihr_raclette_traceroute_reader0',
             'auto.offset.reset': 'earliest',
-            'session.timeout.ms'=1800*1000,
+            # 'session.timeout.ms': 900*1000,
+            'max.poll.interval.ms': 1800*1000,
         })
 
         self.consumer.subscribe([self.config.get('io', 'kafka_topic')])
@@ -40,7 +41,7 @@ class Reader():
     def read(self):
         logging.info("Start consuming data")
         while True:
-            msg = c.poll(1.0)
+            msg = self.consumer.poll(1.0)
 
             if msg is None:
                 continue
@@ -48,7 +49,6 @@ class Reader():
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            print('Received message: {}'.format(msg.value().decode('utf-8')))
             traceroute = msgpack.unpackb(msg.value(), raw=False)
 
             #needed? the consumer is not filtering by msm or probe id
