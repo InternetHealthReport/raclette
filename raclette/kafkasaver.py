@@ -1,9 +1,8 @@
 import multiprocessing
 import logging
 import msgpack
-from kafka import KafkaProducer
-from kafka.admin import KafkaAdminClient, NewTopic
-from kafka.errors import TopicAlreadyExistsError
+from confluent_kafka import Producer
+from confluent_kafka.admin import AdminClient, NewTopic
 
 
 class Saver(multiprocessing.Process):
@@ -21,29 +20,32 @@ class Saver(multiprocessing.Process):
     def run(self):
 
         logging.info("Started saver")
-        self.producer = KafkaProducer(
-                bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'],
-                value_serializer=lambda v: msgpack.packb(v, use_bin_type=True),
-                )
 
-        try:
-            admin_client = KafkaAdminClient(bootstrap_servers=['kafka1:9092', 'kafka2:9092', 'kafka3:9092'], client_id='atlas_producer_admin')
-            topic_list = [NewTopic(name=self.topic, num_partitions=1, replication_factor=1)]
-            admin_client.create_topics(new_topics=topic_list, validate_only=False)
-        except TopicAlreadyExistsError:
-            pass
+        admin_client = AdminClient({'bootstrap.servers':'kafka1:9092, kafka2:9092, kafka3:9092'})
+        topic_list = [NewTopic(self.topic, num_partitions=1, replication_factor=1)]
+        admin_client.create_topics(topic_list)
+        created_topic = admin_client.create_topics(topic_list)
+        for topic, f in created_topic.items():
+            try:
+                f.result()  # The result itself is None
+                logging.warning("Topic {} created".format(topic))
+            except Exception as e:
+                logging.warning("Failed to create topic {}: {}".format(topic, e))
 
+        # Create producer
+        self.producer = Producer({'bootstrap.servers': 'kafka1:9092,kafka2:9092,kafka3:9092',
+            'default.topic.config': {'compression.codec': 'snappy'}}) 
 
         main_running = True
-
         while main_running or not self.saver_queue.empty():
             elem = self.saver_queue.get()
             if isinstance(elem, str):
-                pass
+                if elem == "MAIN_FINISHED":
+                    main_running = False
             else:
                 self.save(elem)
 
-        self.producer.close()
+        self.producer.flush()
 
 
     def save(self, elem):
@@ -54,7 +56,7 @@ class Saver(multiprocessing.Process):
             (ts, startpoint, endpoint, median, minimum, nb_samples, nb_tracks,
                     nb_probes, entropy, hop, nbrealrtts) = data
 
-            serialized_data = {
+            msg = {
                 'ts' : ts,
                 'startpoint' : startpoint,
                 'endpoint' : endpoint,
@@ -68,8 +70,15 @@ class Saver(multiprocessing.Process):
                 'nbrealrtts' : nbrealrtts
                 }
 
-            self.producer.send(self.topic, value = serialized_data,
-                    timestamp_ms=int(ts)*1000)
+
+            self.producer.produce(
+                    self.topic, 
+                    msgpack.packb(msg, use_bin_type=True), 
+                    timestamp = int(ts)*1000
+                    )
+
+            # Trigger any available delivery report callbacks from previous produce() calls
+            self.producer.poll(0)
 
             if self.prevts != ts:
                 self.prevts = ts

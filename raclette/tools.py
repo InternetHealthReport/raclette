@@ -26,8 +26,7 @@ def valid_date(s):
     try:
         return datetime.datetime.strptime(s+"UTC", "%Y-%m-%dT%H:%M%Z")
     except ValueError:
-        msg = "Not a valid date: '{0}'. Accepted format is YYYY-MM-DDThh:mm, for example 2018-06-01T00:00".format(s)
-        raise argparse.ArgumentTypeError(msg)
+        return None
 
 def read_ipmap_data(score):
     with bz2.open("cache/geolocations_ipmap.csv.bz2", "rt") as bz_file:
