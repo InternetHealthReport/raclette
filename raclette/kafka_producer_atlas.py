@@ -1,4 +1,3 @@
-import json
 import calendar
 import json
 import msgpack
@@ -84,7 +83,7 @@ if __name__ == '__main__':
             compression_type='snappy', linger_ms=1000) 
 
     #end import
-    logging.basicConfig()#should be removable soon
+    logging.basicConfig() #should be removable soon
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-C","--config_file", help="Get all parameters from the specified config file", type=str, default="conf/raclette.conf")
