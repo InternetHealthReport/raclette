@@ -40,11 +40,12 @@ class Saver(multiprocessing.Process):
         while main_running or not self.saver_queue.empty():
             elem = self.saver_queue.get()
             if isinstance(elem, str):
-                pass
+                if elem == "MAIN_FINISHED":
+                    main_running = False
             else:
                 self.save(elem)
 
-        self.producer.close()
+        self.producer.flush()
 
 
     def save(self, elem):
