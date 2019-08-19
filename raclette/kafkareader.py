@@ -5,8 +5,6 @@ from confluent_kafka import Consumer, TopicPartition, KafkaError
 import confluent_kafka
 
 
-
-
 class Reader():
     """Consumes traceroute data from Kafka"""
 
@@ -69,8 +67,11 @@ class Reader():
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
+            # Filter with start and end times
             ts = msg.timestamp()
-            # TODO do that when aggregating?
+            if ts[0] == confluent_kafka.TIMESTAMP_CREATE_TIME and ts[1] < self.start:
+                continue
+
             if ts[0] == confluent_kafka.TIMESTAMP_CREATE_TIME and ts[1] >= self.end:
                 self.consumer.pause([TopicPartition(self.topic, msg.partition())])
                 self.partition_paused += 1
@@ -81,7 +82,7 @@ class Reader():
 
             traceroute = msgpack.unpackb(msg.value(), raw=False)
 
-            #needed? the consumer is not filtering by msm or probe id
+            #needed? the consumer is not filtering the msm or probe ids
             # if (self.probe_ids is not None and traceroute['prb_id'] not in self.probe_ids) or \
                     # (self.msm_ids is not None and traceroute['msm_id'] not in self.msm_ids):
                         # pass

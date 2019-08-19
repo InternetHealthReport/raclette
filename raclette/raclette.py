@@ -47,6 +47,7 @@ class Raclette():
 
         self.atlas_start =  tools.valid_date(config.get("io", "start"))
         self.atlas_stop =  tools.valid_date(config.get("io", "stop"))
+
         self.atlas_msm_ids =  [int(x) for x in config.get("io", "msm_ids").split(",") if x]
         self.atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if x]
         self.atlas_chunk_size = int(config.get("io","chunk_size"))
@@ -95,6 +96,20 @@ class Raclette():
 
         self.config = config
 
+
+    def correct_times(self):
+        """
+        If start and stop times are not valid then analyze the last time window
+        """
+
+        # Timestamps are not valid, analyze the last time window
+        if self.atlas_start is None and self.atlas_stop is None:
+            currentTime = datetime.datetime.utcnow()
+            minutebin = int(currentTime.minute / self.tm_window_size)*self.tm_window_size
+            self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=self.tm_window_size/60)
+            self.atlas_stop = currentTime.replace(microsecond=0, second=0, minute=minutebin)
+            logging.warning('Set start and stop times: {}, {}'.format(self.atlas_start, self.atlas_stop))
+            
 
     def save_aggregates(self, saver_queue, aggregates):
         """
@@ -169,7 +184,6 @@ class Raclette():
                 traceback.print_exc(file=sys.stdout)
                 return
 
-
             # # Main Loop:
             with tr_reader:
                 for track in tr_reader.read():
@@ -204,5 +218,6 @@ class Raclette():
 if __name__ == "__main__":
     ra = Raclette()
     ra.read_config()
+    ra.correct_times()
     ra.main() 
 
