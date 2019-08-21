@@ -163,8 +163,8 @@ class Raclette():
             i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
 
             try:
-                timetrac_module = importlib.import_module("timetrack."+self.timetrack_converter)
-                timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
+                timetrack_module = importlib.import_module("timetrack."+self.timetrack_converter)
+                timetrackconverter = timetrack_module.TimeTrackConverter(i2a)
             except ImportError:
                 logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
                 traceback.print_exc(file=sys.stdout)

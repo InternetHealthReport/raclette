@@ -68,7 +68,7 @@ class TimeTrackConverter():
             try:
                 # Initialisation of the timetrack
                 probe = self.probe_info[prb_id]
-                timetrack = {"prb_id": "PB"+prb_id, 
+                timetrack = {"prb_id": "PB"+prb_id+ip_space_str, 
                         "from_asn": "".join(["AS", str(probe[asn_str]),
                             ip_space_str]),
                     "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
@@ -86,14 +86,14 @@ class TimeTrackConverter():
                     probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) \
                             if prb_ip else "Unk PB"+prb_id
 
-                timetrack = {"prb_id": "PB"+prb_id, 
+                timetrack = {"prb_id": "PB"+prb_id+ip_space_str, 
                         "from_asn": "".join(["AS", str(probe[asn_str]),
                             ip_space_str]),
                     "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
                     "rtts":[]}
 
 
-            timetrack["rtts"].append( [probe["location"], [0]] )
+            timetrack["rtts"].append( [probe["location"]+ip_space_str, [0]] )
 
             for hopNb, hop in enumerate(trace["result"]):
 
@@ -126,13 +126,13 @@ class TimeTrackConverter():
                                     and trace["dst_addr"] in self.probe_addresses:
 
                                 pid = self.probe_addresses[trace["dst_addr"]]
-                                locations.append("PB"+str(pid))
+                                # locations.append("PB"+str(pid)+ip_space_str)
                                 dest_city = self.probe_info[pid].get("city") 
                                 if dest_city is not None:
-                                    locations.append(dest_city)
+                                    locations.append(dest_city+ip_space_str)
 
                             elif router_ip in self.ipmap:
-                                locations.append(self.ipmap[router_ip])
+                                locations.append(self.ipmap[router_ip]+ip_space_str)
 
                             location_str= "|".join(locations)
 
