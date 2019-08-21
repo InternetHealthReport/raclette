@@ -54,7 +54,7 @@ class Saver(multiprocessing.Process):
 
         if t == "diffrtt":
             (ts, startpoint, endpoint, median, minimum, nb_samples, nb_tracks,
-                    nb_probes, entropy, hop, nbrealrtts) = data
+                    nb_probes, entropy, hop, nb_real_rtts) = data
 
             msg = {
                 'ts' : ts,
@@ -67,7 +67,7 @@ class Saver(multiprocessing.Process):
                 'nb_probes' : nb_probes,
                 'entropy' : entropy,
                 'hop' : hop,
-                'nbrealrtts' : nbrealrtts
+                'nb_real_rtts' : nb_real_rtts
                 }
 
 
