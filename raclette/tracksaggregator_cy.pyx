@@ -1,4 +1,5 @@
 # distutils: language = c++
+# cython: language_level=3
 
 import traceback
 # except Exception as e:
@@ -43,6 +44,8 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
 
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
 cdef double normalized_entropy(long *count, int nbelem) nogil:
     """ Computes normalized entropy of the given distribution. Does not copy
     the input data.  Slightly faster than scipy implementation for small lists.

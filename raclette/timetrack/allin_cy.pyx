@@ -1,4 +1,6 @@
 #cython: boundscheck=False, nonecheck=False
+# cython: language_level=3
+
 import traceback
 import logging
 import tools
@@ -64,14 +66,14 @@ class TimeTrackConverter():
         cdef str asn_str = "asn_v"+str(trace["af"])
         cdef str ip_space_str = "v"+str(trace["af"])
 
-        try: 
+        try:
             try:
                 # Initialisation of the timetrack
                 probe = self.probe_info[prb_id]
-                timetrack = {"prb_id": "PB"+prb_id, 
+                timetrack = {"prb_id": "PB"+prb_id+ip_space_str,
                         "from_asn": "".join(["AS", str(probe[asn_str]),
                             ip_space_str]),
-                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"],
                     "rtts":[]}
 
             except KeyError:
@@ -81,19 +83,19 @@ class TimeTrackConverter():
                                 if prb_ip else "Unk PB"+prb_id,
                         "location": "PB"+prb_id })
                     self.probe_info[prb_id] = probe
-                
+
                 elif asn_str not in probe:
                     probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) \
                             if prb_ip else "Unk PB"+prb_id
 
-                timetrack = {"prb_id": "PB"+prb_id, 
+                timetrack = {"prb_id": "PB"+prb_id+ip_space_str,
                         "from_asn": "".join(["AS", str(probe[asn_str]),
                             ip_space_str]),
-                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"], 
+                    "msm_id": trace["msm_id"], "timestamp":trace["timestamp"],
                     "rtts":[]}
 
 
-            timetrack["rtts"].append( [probe["location"], [0]] )
+            timetrack["rtts"].append( [probe["location"]+ip_space_str, [0]] )
 
             for hopNb, hop in enumerate(trace["result"]):
 
@@ -104,7 +106,7 @@ class TimeTrackConverter():
                                 or res["rtt"] <= 0.0:
                             continue
 
-                        res_from = res["from"] 
+                        res_from = res["from"]
                         rtt_value = res["rtt"]
 
                         if res_from != router_ip:
@@ -113,26 +115,26 @@ class TimeTrackConverter():
 
                             asn_tmp = self.i2a.ip2asn(res_from)
                             if asn_tmp < 0:
-                                location_str = "".join(["IX", str(asn_tmp*-1), 
+                                location_str = "".join(["IX", str(asn_tmp*-1),
                                     ip_space_str, "|IP", ip_space_str])
                             else:
-                                location_str = "".join(["AS", str(asn_tmp), 
+                                location_str = "".join(["AS", str(asn_tmp),
                                     ip_space_str, "|IP", ip_space_str])
                             router_ip = res_from
-                            
+
                             # Add city if needed
                             locations = [location_str]
                             if router_ip == trace["dst_addr"] \
                                     and trace["dst_addr"] in self.probe_addresses:
 
                                 pid = self.probe_addresses[trace["dst_addr"]]
-                                locations.append("PB"+str(pid))
-                                dest_city = self.probe_info[pid].get("city") 
+                                # locations.append("PB"+str(pid)+ip_space_str)
+                                dest_city = self.probe_info[pid].get("city")
                                 if dest_city is not None:
-                                    locations.append(dest_city)
+                                    locations.append(dest_city+ip_space_str)
 
                             elif router_ip in self.ipmap:
-                                locations.append(self.ipmap[router_ip])
+                                locations.append(self.ipmap[router_ip]+ip_space_str)
 
                             location_str= "|".join(locations)
 

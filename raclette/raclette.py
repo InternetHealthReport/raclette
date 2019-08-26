@@ -105,8 +105,9 @@ class Raclette():
         # Timestamps are not valid, analyze the last time window
         if self.atlas_start is None and self.atlas_stop is None:
             currentTime = datetime.datetime.utcnow()
-            minutebin = int(currentTime.minute / self.tm_window_size)*self.tm_window_size
-            self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=self.tm_window_size/60)
+            window_size = int(self.tm_window_size/60)
+            minutebin = int(currentTime.minute / window_size)*window_size
+            self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=window_size)
             self.atlas_stop = currentTime.replace(microsecond=0, second=0, minute=minutebin)
             logging.warning('Set start and stop times: {}, {}'.format(self.atlas_start, self.atlas_stop))
             
@@ -162,8 +163,8 @@ class Raclette():
             i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
 
             try:
-                timetrac_module = importlib.import_module("timetrack."+self.timetrack_converter)
-                timetrackconverter = timetrac_module.TimeTrackConverter(i2a)
+                timetrack_module = importlib.import_module("timetrack."+self.timetrack_converter)
+                timetrackconverter = timetrack_module.TimeTrackConverter(i2a)
             except ImportError:
                 logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
                 traceback.print_exc(file=sys.stdout)
