@@ -52,9 +52,12 @@ if __name__ == "__main__":
 
         if selected:
             if args.info:
-                selected_probes.append(probe["id"])
-            else:
                 selected_probes.append(probe)
+            else:
+                selected_probes.append(probe["id"])
 
 
-    print(json.dumps(selected_probes, indent=4))
+    if args.info:
+        print(json.dumps(selected_probes, indent=4))
+    else:
+        print(selected_probes)
