@@ -27,8 +27,8 @@ class TimeTrackConverter():
             logging.warning("No probe ID given: %s" % trace)
             return None
 
-        asn_str = "asn_v"+str(trace["af"])
-        ip_space_str = "v"+str(trace["af"])
+        asn_str = "asn_v"+str(trace.get('af', 4))
+        ip_space_str = "v"+str(trace.get('af', 4))
         prb_id = str(trace["prb_id"])
         prb_ip = trace.get("from", "")
 
@@ -100,3 +100,4 @@ class TimeTrackConverter():
 
                     return timetrack
 
+        return None

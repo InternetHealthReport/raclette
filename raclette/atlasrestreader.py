@@ -51,7 +51,7 @@ def cousteau_on_steroid(params, retry=3):
     probes = [None]
 
     if params["probe_ids"]:
-        probes = [params["probe_ids"][x:x+50] for x in range(0, len(params["probe_ids"]), 50)]
+        probes = [params["probe_ids"][x:x+20] for x in range(0, len(params["probe_ids"]), 20)]
 
     session = requests_retry_session()
     for msm in params["msm_id"]:
@@ -124,7 +124,6 @@ class Reader():
 
         window_start = self.start
         while window_start+datetime.timedelta(seconds=self.chunk_size) <= self.end:
-            # for msm_id in self.msm_ids:
             kwargs = {
                 "msm_id": self.msm_ids,
                 "start": window_start,

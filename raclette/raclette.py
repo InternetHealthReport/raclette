@@ -94,6 +94,8 @@ class Raclette():
         for sec in config.sections():
             logging.info("Config: [%s] %s" % (sec,config.items(sec,False)))
 
+        assert self.atlas_chunk_size<self.tm_window_size, 'chunk_size should be smaller than window_size'
+
         self.config = config
 
 
