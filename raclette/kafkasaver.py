@@ -22,7 +22,7 @@ class Saver(multiprocessing.Process):
         logging.info("Started saver")
 
         admin_client = AdminClient({'bootstrap.servers':'kafka1:9092, kafka2:9092, kafka3:9092'})
-        topic_list = [NewTopic(self.topic, num_partitions=1, replication_factor=1)]
+        topic_list = [NewTopic(self.topic, num_partitions=1, replication_factor=2)]
         admin_client.create_topics(topic_list)
         created_topic = admin_client.create_topics(topic_list)
         for topic, f in created_topic.items():
