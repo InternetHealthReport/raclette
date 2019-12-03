@@ -32,7 +32,11 @@ class TimeTrackConverter():
         for probe in tools.get_probes_info():
             try:
                 prb_id = str(probe["id"])
-                probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
+                if "city" in probe:
+                    probe["location"] = "|".join(["PB"+prb_id,probe["city"]])
+                else:
+                    probe["location"] = "|".join(["PB"+prb_id])
+
                 self.probe_info[prb_id] = probe
                 # will get city names only for these addresses
                 self.probe_addresses[probe["address_v4"]]= prb_id

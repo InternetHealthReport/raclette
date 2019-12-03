@@ -32,10 +32,21 @@ def read_ipmap_data(score):
     with bz2.open("cache/geolocations_ipmap.csv.bz2", "rt") as bz_file:
         for line in bz_file:
             words = line.rstrip('\n').split(',')
-            if int(words[-1]) >= score:
-                yield (words[0].rstrip("/32"), words[2], words[3], words[5])
+            try:
+                if int(words[-1]) >= score:
+                    yield (words[0].rstrip("/32"), words[2], words[3], words[5])
+            except:
+                # ignore not well-formated lines in the csv file
+                pass
 
-def get_probes_info():
+def get_probes_info(ipmap=None):
+
+    if ipmap is None:
+        ipmap = {}
+
+        for ip, city, state, country in read_ipmap_data(50):
+            ipmap[ip] = "CT{}, {}, {}".format(city, state, country)
+
     today = datetime.datetime.today()
     if not os.path.exists("cache/"):
         os.mkdir("cache")
@@ -65,23 +76,28 @@ def get_probes_info():
                         )
 
                 # get city and country names
-                coordinates = [(
-                    probe["geometry"]["coordinates"][1], 
-                    probe["geometry"]["coordinates"][0] )
-                    for probe in page["results"] 
-                        if probe["geometry"] is not None 
-                        if probe["geometry"]["coordinates"] is not None ]
+                # coordinates = [(
+                    # probe["geometry"]["coordinates"][1], 
+                    # probe["geometry"]["coordinates"][0] )
+                    # for probe in page["results"] 
+                        # if probe["geometry"] is not None 
+                        # if probe["geometry"]["coordinates"] is not None ]
 
-                cities = rg.search(coordinates)
-                geoloc = dict(zip(coordinates, cities))
+                # cities = rg.search(coordinates)
+                # geoloc = dict(zip(coordinates, cities))
 
                 for probe in page["results"]:
                     bar.next()
                     try:
-                        (lon, lat) = probe["geometry"]["coordinates"]
-                        probe["city"] = "CT{}, {}".format(geoloc[(lat,lon)]["name"], geoloc[(lat,lon)]["cc"])
+                        # (lon, lat) = probe["geometry"]["coordinates"]
+                        # probe["city"] = "CT{}, {}, {}".format(geoloc[(lat,lon)]["name"], geoloc[(lat,lon)]["admin2"], geoloc[(lat,lon)]["cc"])
+                        if probe['address_v4'] in ipmap:
+                            probe["city"] = ipmap[probe["address_v4"]]
+                        elif probe['address_v6'] in ipmap:
+                            probe["city"] = ipmap[probe["address_v6"]]
+
                         probes.append(probe)
-                        # yield probe.copy()
+
                     except TypeError:
                         logging.debug("Error with probe: {}".format(probe))
 

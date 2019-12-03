@@ -1,7 +1,6 @@
 import logging
 import tools
 from ripe.atlas.cousteau import ProbeRequest
-import reverse_geocoder as rg
 
 
 class TimeTrackConverter():
@@ -13,21 +12,6 @@ class TimeTrackConverter():
         self.probe_info = {}
         logging.info("Loading probes info...")
         filters = {"tags": "system-anchor"}
-        # probes = ProbeRequest(**filters)
-        # for probe in probes:
-            # try:
-                # lon, lat = probe["geometry"]["coordinates"]
-                # geoloc = rg.search((lat, lon))
-                # probe["city"] = "{}, {}".format(geoloc[0]["name"], geoloc[0]["cc"])
-                # if "asn_v4" not in probe:
-                    # probe["asn_v4"] = "AS"+str(self.i2a.ip2asn(probe["address_v4"])) 
-                # if "asn_v6" not in probe:
-                    # probe["asn_v6"] = "AS"+str(self.i2a.ip2asn(probe["address_v6"]))
-                # self.probe_info[probe["address_v4"]] = probe
-                # self.probe_info[probe["address_v6"]] = probe
-
-            # except TypeError:
-                # continue
         logging.info("Ready to convert traceroutes!")
 
 
