@@ -15,7 +15,8 @@ class TimeTrackConverter():
                 probe["location"] = "|".join(
                         ["PB"+prb_id, probe["city"]])
                 self.probe_info[prb_id] = probe
-            except TypeError:
+            except (TypeError, KeyError) as e:
+                logging.error('Initialisation problem with probe:\n{}'.format(probe))
                 continue
 
 

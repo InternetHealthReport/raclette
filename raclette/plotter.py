@@ -10,6 +10,7 @@ from datetime import datetime
 import matplotlib.dates as mdates
 import pandas as pd
 
+# FIXME use ipmap instead of this
 try:
     import reverse_geocoder as rg
 except ImportError:
