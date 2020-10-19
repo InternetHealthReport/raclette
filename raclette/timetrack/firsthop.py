@@ -13,9 +13,10 @@ class TimeTrackConverter():
             try:
                 prb_id = str(probe["id"])
                 probe["location"] = "|".join(
-                        ["PB"+prb_id, probe["city"], "PF"+probe["prefix_v4"]])
+                        ["PB"+prb_id, probe["city"]])
                 self.probe_info[prb_id] = probe
-            except TypeError:
+            except (TypeError, KeyError) as e:
+                logging.error('Initialisation problem with probe:\n{}'.format(probe))
                 continue
 
 
@@ -27,8 +28,8 @@ class TimeTrackConverter():
             logging.warning("No probe ID given: %s" % trace)
             return None
 
-        asn_str = "asn_v"+str(trace["af"])
-        ip_space_str = "v"+str(trace["af"])
+        asn_str = "asn_v"+str(trace.get('af', 4))
+        ip_space_str = "v"+str(trace.get('af', 4))
         prb_id = str(trace["prb_id"])
         prb_ip = trace.get("from", "")
 
@@ -45,7 +46,7 @@ class TimeTrackConverter():
                 probe = self.probe_info.setdefault(prb_id, {
                     asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) \
                             if prb_ip else "Unk PB"+prb_id,
-                    "location": "|".join("PB"+prb_id, "PF"+probe["prefix_v4"]) })
+                    "location": "PB"+prb_id })
                 self.probe_info[prb_id] = probe
             
             elif asn_str not in probe:
@@ -100,3 +101,4 @@ class TimeTrackConverter():
 
                     return timetrack
 
+        return None
