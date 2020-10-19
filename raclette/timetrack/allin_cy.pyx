@@ -55,7 +55,9 @@ class TimeTrackConverter():
         """Read a single traceroute result and get rtts for the destination city
         """
 
-        if "prb_id" not in trace or trace is None or "error" in trace["result"][0] or "err" in trace["result"][0]["result"]:
+        if ("prb_id" not in trace or trace is None 
+                or "error" in trace["result"][0] 
+                or "err" in trace["result"][0]["result"]):
             return None
 
         cdef long probe_asn, asn_tmp
@@ -83,13 +85,13 @@ class TimeTrackConverter():
             except KeyError:
                 if prb_id not in self.probe_info:
                     probe = self.probe_info.setdefault(prb_id, {
-                        asn_str: "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                        asn_str: self.i2a.ip2asn(prb_ip) \
                                 if prb_ip else "Unk PB"+prb_id,
                         "location": "PB"+prb_id })
                     self.probe_info[prb_id] = probe
 
                 elif asn_str not in probe:
-                    probe[asn_str] = "AS"+str(self.i2a.ip2asn(prb_ip)) \
+                    probe[asn_str] = self.i2a.ip2asn(prb_ip) \
                             if prb_ip else "Unk PB"+prb_id
 
                 timetrack = {"prb_id": "PB"+prb_id+ip_space_str,
@@ -98,8 +100,12 @@ class TimeTrackConverter():
                     "msm_id": trace["msm_id"], "timestamp":trace["timestamp"],
                     "rtts":[]}
 
+            # add address version to probe's locations
+            startpoints = probe['location'].replace('|',ip_space_str+'|') + ip_space_str
+            # add probe group location
+            startpoints += '|PGAS'+str(probe[asn_str])+ip_space_str
 
-            timetrack["rtts"].append( [probe["location"]+ip_space_str, [0]] )
+            timetrack["rtts"].append( [startpoints, [0]] )
 
             for hopNb, hop in enumerate(trace["result"]):
 
@@ -117,6 +123,7 @@ class TimeTrackConverter():
                             if isPrivateIP(res_from):
                                 continue
 
+                
                             asn_tmp = self.i2a.ip2asn(res_from)
                             if asn_tmp < 0:
                                 location_str = "".join(["IX", str(asn_tmp*-1),
@@ -124,6 +131,7 @@ class TimeTrackConverter():
                             else:
                                 location_str = "".join(["AS", str(asn_tmp),
                                     ip_space_str, "|IP", ip_space_str])
+
                             router_ip = res_from
 
                             # Add city if needed
