@@ -12,8 +12,7 @@ class TimeTrackConverter():
         for probe in tools.get_probes_info():
             try:
                 prb_id = str(probe["id"])
-                probe["location"] = "|".join(
-                        ["PB"+prb_id, probe["city"]])
+                probe["location"] = "PB"+prb_id
                 self.probe_info[prb_id] = probe
             except (TypeError, KeyError) as e:
                 logging.error('Initialisation problem with probe:\n{}'.format(probe))
@@ -24,12 +23,17 @@ class TimeTrackConverter():
         """Read a single traceroute result and get rtts for the first public hop"""
 
         found_first_hop = False
-        if "prb_id" not in trace:
+        if "prb_id" not in trace or "result" not in trace:
             logging.warning("No probe ID given: %s" % trace)
             return None
 
-        asn_str = "asn_v"+str(trace.get('af', 4))
-        ip_space_str = "v"+str(trace.get('af', 4))
+        af = trace.get('af', 4)
+        # last-mile detection works only in IPv4
+        if af != 4:
+            return None
+
+        asn_str = "asn_v"+str(af)
+        ip_space_str = "v"+str(af)
         prb_id = str(trace["prb_id"])
         prb_ip = trace.get("from", "")
 
@@ -60,7 +64,7 @@ class TimeTrackConverter():
                 "rtts":[]}
 
 
-        timetrack["rtts"].append( [probe["location"], [0]] )
+        timetrack["rtts"].append( [probe["location"]+ip_space_str, [0]] )
 
         prev_hop_rtt = None
         curr_hop_rtt = [0]
@@ -81,11 +85,25 @@ class TimeTrackConverter():
                         curr_hop_rtt.append(res["rtt"])
                         continue
 
+
                     found_first_hop = True
-                    if res["from"] != router_ip:
-                        router_ip = res["from"]    
-                        router_asn = str(self.i2a.ip2asn(router_ip))
-                        location_str = "".join(["LM", str(router_asn), ip_space_str])
+                    router_ip = res["from"]    
+                    router_asn = str(self.i2a.ip2asn(router_ip))
+
+                    # router IP might not be announced on BGP
+                    if router_asn == '0' or router_asn is None:
+                        if isinstance(probe[asn_str], int):
+                            router_asn = str(probe[asn_str])
+                        elif isinstance(probe[asn_str], str) and probe[asn_str].startswith('AS'):
+                            router_asn = probe[asn_str][2:]
+                        else:
+                            return None
+
+                    # check that router ASN is same as the probe
+                    elif router_asn != str(probe[asn_str]).rpartition('AS')[2]:
+                        return None
+
+                    location_str = "".join(["LM", router_asn, ip_space_str])
 
                     if len(timetrack["rtts"])==0 or timetrack["rtts"][-1][0] != location_str:
                         timetrack["rtts"].append((location_str,[]))
