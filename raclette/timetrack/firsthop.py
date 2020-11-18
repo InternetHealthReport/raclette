@@ -24,8 +24,8 @@ class TimeTrackConverter():
         """Read a single traceroute result and get rtts for the first public hop"""
 
         found_first_hop = False
-        if "prb_id" not in trace:
-            logging.warning("No probe ID given: %s" % trace)
+        if "prb_id" not in trace or "result" not in trace:
+            logging.warning("No probe ID or result given: %s" % trace)
             return None
 
         asn_str = "asn_v"+str(trace.get('af', 4))
