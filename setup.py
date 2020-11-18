@@ -17,6 +17,13 @@ ext_modules=[
               extra_compile_args = ["-ffast-math"],
               ),
               
+        Extension("raclette.timetrack.lastmile",
+              ["raclette/timetrack/lastmile.pyx"],
+              libraries=["m"],
+              extra_compile_args = ["-ffast-math"],
+              ),
+              
+              
               ]
 
 setup(

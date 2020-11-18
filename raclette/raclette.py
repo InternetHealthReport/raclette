@@ -2,11 +2,9 @@ import sys
 import os
 import logging
 import datetime
-from collections import defaultdict
-import pickle
 import configparser
 import argparse
-from multiprocessing import Process, Pool, Queue, Pipe
+from multiprocessing import Queue, Pipe
 import importlib
 import traceback
 
@@ -30,9 +28,10 @@ class Raclette():
         """
 
         parser = argparse.ArgumentParser()
-        parser.add_argument("-C","--config_file", 
-                help="Get all parameters from the specified config file", 
-                type=str, default="conf/raclette.conf")
+        parser.add_argument(
+            "-C", "--config_file",
+            help="Get all parameters from the specified config file",
+            type=str, default="conf/raclette.conf")
         args = parser.parse_args()
 
         # Read the config file
