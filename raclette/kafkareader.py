@@ -30,7 +30,7 @@ class Reader():
 
         self.consumer = Consumer({
             'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
-            'group.id': 'ihr_raclette_traceroute_reader0',
+            'group.id': 'ihr_raclette_traceroute_reader_'+self.timetrack_converter.__module__,
             'auto.offset.reset': 'earliest',
             'max.poll.interval.ms': 1800*1000,
         })
