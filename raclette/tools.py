@@ -113,3 +113,7 @@ def get_probes_info(ipmap=None):
         fi.close()
 
         return probes
+
+if __name__ == "__main__":
+    # Populate cache if empty
+    get_probes_info()

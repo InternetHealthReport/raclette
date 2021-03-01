@@ -30,29 +30,28 @@ class Reader():
 
         self.consumer = Consumer({
             'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
-            'group.id': 'ihr_raclette_traceroute_reader_'+self.timetrack_converter.__module__,
             'auto.offset.reset': 'earliest',
             'max.poll.interval.ms': 1800*1000,
         })
-
-        self.consumer.subscribe([self.topic])
 
         # Set offsets according to start time
         topic_info = self.consumer.list_topics(self.topic)
         partitions = [TopicPartition(self.topic, partition_id, self.start) 
                 for partition_id in  topic_info.topics[self.topic].partitions.keys()]
-        self.partition_total = len(partitions)
-        self.partition_paused = 0
 
         offsets = self.consumer.offsets_for_times(partitions)
-        self.consumer.poll()
-        for offset in offsets:
-            self.consumer.seek(offset)
+
+        # remove empty partitions
+        offsets = [part for part in offsets if part.offset > 0]
+        self.partition_total = len(offsets)
+        self.partition_paused = 0
+        self.assign(offsets)
 
         return self
 
     def __exit__(self, type, value, traceback):
-        pass
+        self.consumer.close()
+        logging.info("closed the consumer")
 
     def read(self):
 
@@ -89,5 +88,3 @@ class Reader():
 
             yield self.timetrack_converter.traceroute2timetrack(traceroute)
 
-        self.consumer.close()
-        logging.info("closed the consumer")
