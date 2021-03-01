@@ -30,6 +30,7 @@ class Reader():
 
         self.consumer = Consumer({
             'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
+            'group.id': 'ihr_raclette_'+str(self.start),
             'auto.offset.reset': 'earliest',
             'max.poll.interval.ms': 1800*1000,
         })
@@ -45,7 +46,7 @@ class Reader():
         offsets = [part for part in offsets if part.offset > 0]
         self.partition_total = len(offsets)
         self.partition_paused = 0
-        self.assign(offsets)
+        self.consumer.assign(offsets)
 
         return self
 
