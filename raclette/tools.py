@@ -54,7 +54,7 @@ def get_probes_info(ipmap=None):
     if os.path.exists("cache/probe_info.json"):
         # Get probe information from cache
         cache = json.load(open("cache/probe_info.json","r"))
-        print("Loading probe information from cache")
+#        print("Loading probe information from cache")
 
         return cache["probes"]
 
