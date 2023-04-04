@@ -36,9 +36,7 @@ def read_ipmap_data(score):
                 if float(words[-1]) >= score:
                     yield (words[0].rstrip("/32"), words[2], words[3], words[5])
             except Exception as e:
-                print(e)
                 # ignore not well-formated lines in the csv file
-                print(line)
                 pass
 
 def get_probes_info(ipmap=None):
