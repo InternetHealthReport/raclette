@@ -44,16 +44,16 @@ class Raclette():
             # Default to Atlas REST 
             self.reader = "atlasrestreader"
 
-        self.atlas_start =  tools.valid_date(config.get("io", "start"))
-        self.atlas_stop =  tools.valid_date(config.get("io", "stop"))
+        self.atlas_start = tools.valid_date(config.get("io", "start"))
+        self.atlas_stop = tools.valid_date(config.get("io", "stop"))
 
-        self.atlas_msm_ids =  [int(x) for x in config.get("io", "msm_ids").split(",") if x]
-        self.atlas_probe_ids =  [int(x) for x in config.get("io", "probe_ids").split(",") if x]
-        self.atlas_chunk_size = int(config.get("io","chunk_size"))
+        self.atlas_msm_ids = [int(x) for x in config.get("io", "msm_ids").split(",") if x]
+        self.atlas_probe_ids = [int(x) for x in config.get("io", "probe_ids").split(",") if x]
+        self.atlas_chunk_size = int(config.get("io", "chunk_size"))
 
         try:
-            self.dump_name =  config.get("io", "dump_file")
-            self.dump_filter =  config.get("io", "filter")
+            self.dump_name = config.get("io", "dump_file")
+            self.dump_filter = config.get("io", "filter")
         except configparser.NoOptionError:
             pass
 
@@ -66,6 +66,15 @@ class Raclette():
         self.ip2asn_dir = config.get("lib", "ip2asn_directory")
         self.ip2asn_db = config.get("lib", "ip2asn_db")
         self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
+
+        try:
+            self.ip2asn_kafka_server = config.get("lib", "ip2asn_kafka_server")
+            self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
+        except configparser.NoOptionError:
+            pass
+
+        self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
+        self.ip2asn_kafka_server = config.get("lib", "ip2asn_kafka_server")
 
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
