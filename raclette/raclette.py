@@ -13,6 +13,10 @@ import tools
 from tracksaggregator_cy import TracksAggregator
 from anomalydetector import AnomalyDetector
 
+global KAFKA_HOST
+if 'KAFKA_HOST' in os.environ:
+    KAFKA_HOST = os.environ['KAFKA_HOST']
+
 
 class Raclette():
     """
@@ -67,14 +71,11 @@ class Raclette():
         self.ip2asn_db = config.get("lib", "ip2asn_db")
         self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
 
+        self.ip2asn_kafka_topic = ''
         try:
-            self.ip2asn_kafka_server = config.get("lib", "ip2asn_kafka_server")
             self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
         except configparser.NoOptionError:
             pass
-
-        self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
-        self.ip2asn_kafka_server = config.get("lib", "ip2asn_kafka_server")
 
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
@@ -92,7 +93,7 @@ class Raclette():
         # Create output directories
         for fname in [self.saver_filename, self.log_filename]:
             dname = fname.rpartition("/")[0]
-            if not os.path.exists(dname):
+            if dname and not os.path.exists(dname):
                 os.makedirs(dname)
 
         FORMAT = '%(asctime)s %(processName)s %(message)s'
@@ -170,7 +171,7 @@ class Raclette():
             # Time Track initialisation
             sys.path.append(self.ip2asn_dir)
             import ip2asn
-            i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp)
+            i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp, self.ip2asn_kafka_topic, KAFKA_HOST)
 
             try:
                 timetrack_module = importlib.import_module("timetrack."+self.timetrack_converter)
@@ -227,6 +228,7 @@ class Raclette():
             print(traceback.format_exc())
 
 if __name__ == "__main__":
+
     ra = Raclette()
     ra.read_config()
     ra.correct_times()

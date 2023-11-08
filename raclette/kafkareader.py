@@ -1,16 +1,18 @@
-import msgpack
-import logging
 import calendar
+import logging
+import msgpack
+import os
 from confluent_kafka import Consumer, TopicPartition, KafkaError
 import confluent_kafka
 
+global KAFKA_HOST
+KAFKA_HOST = os.environ['KAFKA_HOST']
 
 class Reader():
     """Consumes traceroute data from Kafka"""
 
-    def __init__(self, start, end, timetrack_converter, 
-                msm_ids=[5001, 5004, 5005], probe_ids=[1, 2, 3, 4, 5, 6, 7, 8], 
-                chunk_size=900, config=None):
+    def __init__(self, start, end, timetrack_converter, msm_ids=[5001, 5004, 5005],
+                 probe_ids=[1, 2, 3, 4, 5, 6, 7, 8], chunk_size=900, config=None):
 
         self.msm_ids = msm_ids
         self.probe_ids = probe_ids
@@ -29,7 +31,7 @@ class Reader():
         """Setup kafka consumer"""
 
         self.consumer = Consumer({
-            'bootstrap.servers': 'kafka1:9092, kafka2:9092, kafka3:9092',
+            'bootstrap.servers': KAFKA_HOST,
             'group.id': 'ihr_raclette_'+str(self.start),
             'auto.offset.reset': 'earliest',
             'max.poll.interval.ms': 1800*1000,
@@ -37,8 +39,8 @@ class Reader():
 
         # Set offsets according to start time
         topic_info = self.consumer.list_topics(self.topic)
-        partitions = [TopicPartition(self.topic, partition_id, self.start) 
-                for partition_id in  topic_info.topics[self.topic].partitions.keys()]
+        partitions = [TopicPartition(self.topic, partition_id, self.start)
+                      for partition_id in topic_info.topics[self.topic].partitions.keys()]
 
         offsets = self.consumer.offsets_for_times(partitions)
 

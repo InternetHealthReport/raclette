@@ -10,3 +10,5 @@ cython
 progress
 py-radix
 pandas
+msgpack
+confluent_kafka
