@@ -14,6 +14,7 @@ from tracksaggregator_cy import TracksAggregator
 from anomalydetector import AnomalyDetector
 
 global KAFKA_HOST
+KAFKA_HOST = ''
 if 'KAFKA_HOST' in os.environ:
     KAFKA_HOST = os.environ['KAFKA_HOST']
 
