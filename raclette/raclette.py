@@ -116,7 +116,7 @@ class Raclette():
 
         # Timestamps are not valid, analyze the last time window
         if self.atlas_start is None and self.atlas_stop is None:
-            currentTime = datetime.datetime.utcnow()
+            currentTime = datetime.datetime.now(datetime.timezone.utc)
             window_size = int(self.tm_window_size/60)
             minutebin = int(currentTime.minute / window_size)*window_size
             self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=window_size)
@@ -184,7 +184,7 @@ class Raclette():
 
             # Aggregator initialisation
             tm = TracksAggregator(self.tm_window_size, self.tm_significance_level, self.tm_min_tracks)
-            saver_queue.put(("experiment", [datetime.datetime.now(), str(sys.argv), str(self.config.sections())]))
+            saver_queue.put(("experiment", [datetime.datetime.now(datetime.timezone.utc), str(sys.argv), str(self.config.sections())]))
 
             # Reader initialisation
             try:

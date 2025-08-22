@@ -108,7 +108,7 @@ def get_probes_info(ipmap=None):
         fi = open("cache/probe_info.json", "w")
         json.dump({
             "probes":probes, 
-            "timestamp":str(datetime.datetime.utcnow())
+            "timestamp":str(datetime.datetime.now(datetime.timezone.utc))
             }, fi, indent=4)
         fi.close()
 
