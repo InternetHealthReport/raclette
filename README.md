@@ -12,12 +12,14 @@ Get the latest source files:
 git clone git@github.com:InternetHealthReport/raclette.git
 ```
 
-Install dependencies and install raclette:
+Install dependencies, install raclette, and feed cache directory:
 ```
 cd raclette
 sudo pip3 install -r requirements.txt 
 python3 setup.py build_ext --inplace
 sudo python3 setup.py install
+mkdir cache
+wget https://ftp.ripe.net/ripe/ipmap/geolocations-latest -O cache/geolocations_ipmap.csv.bz2 
 ```
 
 
