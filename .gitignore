@@ -100,5 +100,8 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# ignore ipmap file updated by user
+cache/geolocations_ipmap.csv.bz2
+
 # mypy
 .mypy_cache/
