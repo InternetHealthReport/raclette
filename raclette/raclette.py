@@ -119,8 +119,8 @@ class Raclette():
             currentTime = datetime.datetime.now(datetime.timezone.utc)
             window_size = int(self.tm_window_size/60)
             minutebin = int(currentTime.minute / window_size)*window_size
-            self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=window_size)
-            self.atlas_stop = currentTime.replace(microsecond=0, second=0, minute=minutebin)
+            self.atlas_start = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=window_size*2)
+            self.atlas_stop = currentTime.replace(microsecond=0, second=0, minute=minutebin)-datetime.timedelta(minutes=window_size)
             logging.warning('Set start and stop times: {}, {}'.format(self.atlas_start, self.atlas_stop))
             
 
