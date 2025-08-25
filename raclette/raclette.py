@@ -150,19 +150,21 @@ class Raclette():
         Main program connecting all modules.
         """
 
+        # Saver initialisation
+        saver_queue = Queue()
         try:
-            # Saver initialisation
-            saver_queue = Queue()
-            try:
-                saver_module = importlib.import_module(self.saver)
-                # These are run in a separate process
-                saver = saver_module.Saver(self.saver_filename, saver_queue)
-                saver.start()
-            except ImportError:
-                logging.error("Saver unknown! ({})".format(self.saver))
-                traceback.print_exc(file=sys.stdout)
-                return
+            saver_module = importlib.import_module(self.saver)
+            # These are run in a separate process
+            saver = saver_module.Saver(self.saver_filename, saver_queue)
+            saver.start()
+        except ImportError:
+            logging.error("Saver unknown! ({})".format(self.saver))
+            traceback.print_exc(file=sys.stdout)
+            saver_queue.put("MAIN_FINISHED")
+            saver.join()
+            return
 
+        try:
             # Detector initialisation
             if self.detection_enabled:
                 self.detector_pipe = Pipe(False)
@@ -180,21 +182,30 @@ class Raclette():
             except ImportError:
                 logging.error("Timetrack converter unknown! ({})".format(self.timetrack_converter))
                 traceback.print_exc(file=sys.stdout)
+                saver_queue.put("MAIN_FINISHED")
+                saver.join()
                 return
 
             # Aggregator initialisation
             tm = TracksAggregator(self.tm_window_size, self.tm_significance_level, self.tm_min_tracks)
-            saver_queue.put(("experiment", [datetime.datetime.now(datetime.timezone.utc), str(sys.argv), str(self.config.sections())]))
+            saver_queue.put(("experiment", [
+                datetime.datetime.now(datetime.timezone.utc),
+                str(sys.argv),
+                str(self.config.sections())]))
 
             # Reader initialisation
             try:
                 reader_module = importlib.import_module(self.reader)
-                tr_reader = reader_module.Reader(self.atlas_start, self.atlas_stop, timetrackconverter, 
-                    self.atlas_msm_ids, self.atlas_probe_ids, chunk_size=self.atlas_chunk_size, config=self.config) 
-            # tr_reader  = DumpReader(dump_name, dump_filter)
+                tr_reader = reader_module.Reader(
+                        self.atlas_start, self.atlas_stop, timetrackconverter,
+                        self.atlas_msm_ids, self.atlas_probe_ids,
+                        chunk_size=self.atlas_chunk_size, config=self.config)
+
             except ImportError:
                 logging.error("Reader unknown! ({})".format(self.reader))
                 traceback.print_exc(file=sys.stdout)
+                saver_queue.put("MAIN_FINISHED")
+                saver.join()
                 return
 
             # # Main Loop:
@@ -203,7 +214,7 @@ class Raclette():
                     if not track:
                         continue
 
-                    aggregates = tm.add_track(track) 
+                    aggregates = tm.add_track(track)
                     if aggregates:
                         self.save_aggregates(saver_queue, aggregates)
 
@@ -223,15 +234,19 @@ class Raclette():
                 detector.terminate()
 
             logging.info("Ended on {}".format(datetime.datetime.today()))
-        
+ 
         except Exception as e:
-            print("type error: " + str(e))
-            print(traceback.format_exc())
+            logging.error("type error: " + str(e))
+            traceback.print_exc(file=sys.stdout)
+            saver_queue.put("MAIN_FINISHED")
+            saver.join()
+            return
+
 
 if __name__ == "__main__":
 
     ra = Raclette()
     ra.read_config()
     ra.correct_times()
-    ra.main() 
+    ra.main()
 

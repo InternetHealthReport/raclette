@@ -45,7 +45,10 @@ class Reader():
         offsets = self.consumer.offsets_for_times(partitions)
 
         # remove empty partitions
-        offsets = [part for part in offsets if part.offset > 0]
+        offsets = [part for part in offsets if part.offset >= 0]
+        if len(offsets) == 0:
+            raise Exception('Empty offsets')
+
         self.partition_total = len(offsets)
         self.partition_paused = 0
         self.consumer.assign(offsets)
@@ -63,6 +66,7 @@ class Reader():
             msg = self.consumer.poll(1.0)
 
             if msg is None:
+                logging.info('timeout')
                 continue
 
             if msg.error():
