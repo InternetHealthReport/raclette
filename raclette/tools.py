@@ -10,23 +10,27 @@ import reverse_geocoder as rg
 import logging
 
 # https://en.wikipedia.org/wiki/Private_network
-priv_lo = re.compile("^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-priv_24 = re.compile("^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-priv_20 = re.compile("^192\.168\.\d{1,3}.\d{1,3}$")
-priv_16 = re.compile("^172.(1[6-9]|2[0-9]|3[0-1]).[0-9]{1,3}.[0-9]{1,3}$")
+priv_lo = re.compile(r"^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+priv_24 = re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+priv_20 = re.compile(r"^192\.168\.\d{1,3}.\d{1,3}$")
+priv_16 = re.compile(r"^172.(1[6-9]|2[0-9]|3[0-1]).[0-9]{1,3}.[0-9]{1,3}$")
+
 
 def isPrivateIP(ip):
 
     return priv_lo.match(ip) or priv_24.match(ip) or priv_20.match(ip) or priv_16.match(ip)
 
-def defaultdictlist(): 
+
+def defaultdictlist():
     return defaultdict(list)
+
 
 def valid_date(s):
     try:
         return datetime.datetime.strptime(s+"UTC", "%Y-%m-%dT%H:%M%Z")
     except ValueError:
         return None
+
 
 def read_ipmap_data(score):
     with bz2.open("cache/geolocations_ipmap.csv.bz2", "rt") as bz_file:
@@ -38,6 +42,7 @@ def read_ipmap_data(score):
             except Exception as e:
                 # ignore not well-formated lines in the csv file
                 pass
+
 
 def get_probes_info(ipmap=None):
 
@@ -53,14 +58,14 @@ def get_probes_info(ipmap=None):
 
     if os.path.exists("cache/probe_info.json"):
         # Get probe information from cache
-        cache = json.load(open("cache/probe_info.json","r"))
+        cache = json.load(open("cache/probe_info.json", "r"))
 #        print("Loading probe information from cache")
 
         return cache["probes"]
 
     else:
         # Fetch probe information from RIPE API
-        url = "https://atlas.ripe.net/api/v2/probes/" 
+        url = "https://atlas.ripe.net/api/v2/probes/"
         bar = None
         probes = []
         with requests.Session() as session:
@@ -70,17 +75,17 @@ def get_probes_info(ipmap=None):
                 page = session.get(url).json()
                 if bar is None:
                     bar = Bar(
-                        "Fetching probe information from RIPE API", 
-                        max=page["count"], 
+                        "Fetching probe information from RIPE API",
+                        max=page["count"],
                         suffix='%(percent)d%%'
                         )
 
                 # get city and country names
                 # coordinates = [(
-                    # probe["geometry"]["coordinates"][1], 
+                    # probe["geometry"]["coordinates"][1],
                     # probe["geometry"]["coordinates"][0] )
-                    # for probe in page["results"] 
-                        # if probe["geometry"] is not None 
+                    # for probe in page["results"]:
+                        # if probe["geometry"] is not None
                         # if probe["geometry"]["coordinates"] is not None ]
 
                 # cities = rg.search(coordinates)
@@ -107,12 +112,13 @@ def get_probes_info(ipmap=None):
         # Save probe information to cache
         fi = open("cache/probe_info.json", "w")
         json.dump({
-            "probes":probes, 
-            "timestamp":str(datetime.datetime.now(datetime.timezone.utc))
+            "probes": probes,
+            "timestamp": str(datetime.datetime.now(datetime.timezone.utc))
             }, fi, indent=4)
         fi.close()
 
         return probes
+
 
 if __name__ == "__main__":
     # Populate cache if empty
