@@ -29,6 +29,17 @@ database can be given with the `IPINFO_DB` environment variable:
 export IPINFO_DB=/path/to/your/ipinfo_location.mmdb
 ```
 
+Anycast IP addresses are hosted at multiple locations, so geolocating them is
+meaningless. Raclette therefore ignores IP addresses that fall in an anycast
+prefix. Anycast prefixes come from the [LACeS anycast
+census](https://manycast.net/) (datasets `utwente.laces_v4` and
+`utwente.laces_v6`), which is fetched from [IYP](https://iyp.iijlab.net/) and
+cached in `cache/anycast_prefixes.json` (refreshed weekly). A different IYP
+instance can be given with the `IYP_URL` environment variable:
+```
+export IYP_URL=neo4j://iyp-bolt.ihr.live:7687
+```
+
 RIPE ipmap geolocations can still be used instead (see
 `tools.IpmapGeolocation`), in that case fetch the ipmap data first:
 ```

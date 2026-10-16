@@ -14,3 +14,4 @@ pandas
 msgpack
 confluent_kafka
 maxminddb
+neo4j
