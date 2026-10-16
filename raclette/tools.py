@@ -9,6 +9,15 @@ from progress.bar import Bar
 import reverse_geocoder as rg
 import logging
 
+import maxminddb
+
+# Default IPinfo geolocation database (mmdb format). Can be overridden with the
+# IPINFO_DB environment variable.
+IPINFO_DB = os.environ.get("IPINFO_DB", "data/ipinfo_location.mmdb")
+
+# Minimum score for ipmap geolocations (legacy)
+IPMAP_MIN_SCORE = 50
+
 # https://en.wikipedia.org/wiki/Private_network
 priv_lo = re.compile(r"^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 priv_24 = re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
@@ -32,7 +41,72 @@ def valid_date(s):
         return None
 
 
+def location2str(city, region, country):
+    """Textual representation of a location as used in time tracks."""
+
+    return "CT{}, {}, {}".format(city, region, country)
+
+
+class Geolocation():
+    """Geolocate IP addresses with an IPinfo database (mmdb format).
+
+    Locations are returned as a string formatted as 'CTcity, region, country',
+    or None if the IP address is not found in the database.
+    """
+
+    def __init__(self, db_fname=None):
+
+        self.db_fname = db_fname if db_fname else IPINFO_DB
+        self.reader = None
+
+        try:
+            self.reader = maxminddb.open_database(self.db_fname)
+            logging.info("Loaded IPinfo geolocation database: {}".format(
+                self.db_fname))
+        except (FileNotFoundError, maxminddb.InvalidDatabaseError) as e:
+            logging.error("Could not open IPinfo database {} ({}). "
+                          "IP addresses will not be geolocated.".format(
+                              self.db_fname, e))
+
+    def ip2city(self, ip):
+        """Return the location of the given IP address, or None if unknown."""
+
+        if self.reader is None or not ip:
+            return None
+
+        try:
+            location = self.reader.get(ip)
+        except ValueError:
+            # not a valid IP address
+            return None
+
+        if not location:
+            return None
+
+        city = location.get("city", "")
+        region = location.get("region", "")
+        country = location.get("country_code", "")
+
+        if not city and not region and not country:
+            return None
+
+        return location2str(city, region, country)
+
+    def close(self):
+        if self.reader is not None:
+            self.reader.close()
+            self.reader = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+
 def read_ipmap_data(score):
+    """Read RIPE ipmap geolocations from the cache directory (legacy)."""
+
     with bz2.open("cache/geolocations_ipmap.csv.bz2", "rt") as bz_file:
         for line in bz_file:
             words = line.rstrip('\n').split(',')
@@ -44,13 +118,46 @@ def read_ipmap_data(score):
                 pass
 
 
-def get_probes_info(ipmap=None):
+class IpmapGeolocation():
+    """Geolocate IP addresses with RIPE ipmap data (legacy).
 
-    if ipmap is None:
-        ipmap = {}
+    This is a drop-in replacement for Geolocation, it is kept for the case we
+    want to use ipmap geolocations again.
+    """
 
-        for ip, city, state, country in read_ipmap_data(50):
-            ipmap[ip] = "CT{}, {}, {}".format(city, state, country)
+    def __init__(self, score=IPMAP_MIN_SCORE):
+
+        self.ipmap = {}
+        for ip, city, region, country in read_ipmap_data(score):
+            self.ipmap[ip] = location2str(city, region, country)
+
+    def ip2city(self, ip):
+        """Return the location of the given IP address, or None if unknown."""
+
+        return self.ipmap.get(ip)
+
+    def close(self):
+        self.ipmap = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+
+def get_probes_info(geoloc=None):
+    """Fetch RIPE Atlas probes information and add the city of the probes that
+    can be geolocated.
+
+    geoloc is an object providing an ip2city method (e.g. Geolocation or
+    IpmapGeolocation), by default the IPinfo database is used.
+    """
+
+    close_geoloc = False
+    if geoloc is None:
+        geoloc = Geolocation()
+        close_geoloc = True
 
     today = datetime.datetime.today()
     if not os.path.exists("cache/"):
@@ -60,6 +167,9 @@ def get_probes_info(ipmap=None):
         # Get probe information from cache
         cache = json.load(open("cache/probe_info.json", "r"))
 #        print("Loading probe information from cache")
+
+        if close_geoloc:
+            geoloc.close()
 
         return cache["probes"]
 
@@ -80,26 +190,15 @@ def get_probes_info(ipmap=None):
                         suffix='%(percent)d%%'
                         )
 
-                # get city and country names
-                # coordinates = [(
-                    # probe["geometry"]["coordinates"][1],
-                    # probe["geometry"]["coordinates"][0] )
-                    # for probe in page["results"]:
-                        # if probe["geometry"] is not None
-                        # if probe["geometry"]["coordinates"] is not None ]
-
-                # cities = rg.search(coordinates)
-                # geoloc = dict(zip(coordinates, cities))
-
                 for probe in page["results"]:
                     bar.next()
                     try:
-                        # (lon, lat) = probe["geometry"]["coordinates"]
-                        # probe["city"] = "CT{}, {}, {}".format(geoloc[(lat,lon)]["name"], geoloc[(lat,lon)]["admin2"], geoloc[(lat,lon)]["cc"])
-                        if probe['address_v4'] in ipmap:
-                            probe["city"] = ipmap[probe["address_v4"]]
-                        elif probe['address_v6'] in ipmap:
-                            probe["city"] = ipmap[probe["address_v6"]]
+                        city = geoloc.ip2city(probe["address_v4"])
+                        if city is None:
+                            city = geoloc.ip2city(probe["address_v6"])
+
+                        if city is not None:
+                            probe["city"] = city
 
                         probes.append(probe)
 
@@ -116,6 +215,9 @@ def get_probes_info(ipmap=None):
             "timestamp": str(datetime.datetime.now(datetime.timezone.utc))
             }, fi, indent=4)
         fi.close()
+
+        if close_geoloc:
+            geoloc.close()
 
         return probes
 

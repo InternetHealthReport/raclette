@@ -103,5 +103,8 @@ venv.bak/
 # ignore ipmap file updated by user
 cache/geolocations_ipmap.csv.bz2
 
+# ignore ipinfo geolocation database updated by user
+data/*.mmdb
+
 # mypy
 .mypy_cache/

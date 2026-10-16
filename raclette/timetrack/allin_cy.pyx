@@ -28,8 +28,10 @@ class TimeTrackConverter():
         self.i2a = i2a
         self.probe_info = {}
         self.probe_addresses = {}
-        self.ipmap = {}
-        for probe in tools.get_probes_info():
+        # Geolocation of router IP addresses (IPinfo database).
+        # Use tools.IpmapGeolocation() instead for RIPE ipmap geolocations.
+        self.geoloc = tools.Geolocation()
+        for probe in tools.get_probes_info(self.geoloc):
             try:
                 prb_id = str(probe["id"])
                 if "city" in probe:
@@ -43,9 +45,6 @@ class TimeTrackConverter():
                 self.probe_addresses[probe["address_v6"]]= prb_id
             except TypeError:
                 continue
-
-        for ip, city, state, country in tools.read_ipmap_data(50):
-            self.ipmap[ip] = "CT{}, {}, {}".format(city, state, country)
 
         logging.info("Ready to convert traceroutes! (loaded {} probes info)"
                 .format(len(self.probe_info)))
@@ -145,8 +144,10 @@ class TimeTrackConverter():
                                 if dest_city is not None:
                                     locations.append(dest_city+ip_space_str)
 
-                            elif router_ip in self.ipmap:
-                                locations.append(self.ipmap[router_ip]+ip_space_str)
+                            else:
+                                router_city = self.geoloc.ip2city(router_ip)
+                                if router_city is not None:
+                                    locations.append(router_city+ip_space_str)
 
                             location_str= "|".join(locations)
 

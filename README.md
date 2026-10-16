@@ -19,6 +19,19 @@ sudo pip3 install -r requirements.txt
 python3 setup.py build_ext --inplace
 sudo python3 setup.py install
 mkdir cache
+```
+
+## IP geolocation
+IP addresses are geolocated with an [IPinfo](https://ipinfo.io/) database in
+mmdb format. By default raclette reads `data/ipinfo_location.mmdb`, a different
+database can be given with the `IPINFO_DB` environment variable:
+```
+export IPINFO_DB=/path/to/your/ipinfo_location.mmdb
+```
+
+RIPE ipmap geolocations can still be used instead (see
+`tools.IpmapGeolocation`), in that case fetch the ipmap data first:
+```
 wget https://ftp.ripe.net/ripe/ipmap/geolocations-latest -O cache/geolocations_ipmap.csv.bz2 
 ```
 
