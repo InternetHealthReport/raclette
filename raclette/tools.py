@@ -31,9 +31,22 @@ IYP_URL = os.environ.get("IYP_URL", "neo4j://iyp-bolt.ihr.live:7687")
 # LACeS anycast census datasets in IYP
 LACES_REFERENCE_NAMES = ["utwente.laces_v4", "utwente.laces_v6"]
 
-# Anycast prefixes are cached on disk and refreshed when older than this
+# BGPKIT prefix to ASN dataset in IYP
+PFX2ASN_REFERENCE_NAME = "bgpkit.pfx2asn"
+
+# PeeringDB IXP dataset in IYP
+IXP_REFERENCE_NAME = "peeringdb.ix"
+
+# Prefixes fetched from IYP are cached on disk and refreshed when older than
+# the corresponding max age
 ANYCAST_CACHE_FNAME = "cache/anycast_prefixes.json"
 ANYCAST_CACHE_MAX_AGE = datetime.timedelta(days=7)
+
+PFX2ASN_CACHE_FNAME = "cache/pfx2asn.json"
+PFX2ASN_CACHE_MAX_AGE = datetime.timedelta(days=1)
+
+IXP_CACHE_FNAME = "cache/ixp_prefixes.json"
+IXP_CACHE_MAX_AGE = datetime.timedelta(days=7)
 
 # Get the prefixes inferred as anycast by LACeS. These are the GeoPrefix nodes
 # created by LACeS, BGP prefixes tagged as 'Anycast' may be only partially
@@ -41,6 +54,17 @@ ANYCAST_CACHE_MAX_AGE = datetime.timedelta(days=7)
 ANYCAST_QUERY = """MATCH (p:GeoPrefix)-[l:LOCATED_IN]->(:Point)
 WHERE l.reference_name IN $reference_names
 RETURN DISTINCT p.prefix AS prefix"""
+
+# Get the prefixes originated by each AS. A prefix may be originated by
+# several ASes (MOAS), in that case it is reported once per AS.
+PFX2ASN_QUERY = """MATCH (a:AS)-[o:ORIGINATE]->(p:BGPPrefix)
+WHERE o.reference_name = $reference_name
+RETURN p.prefix AS prefix, a.asn AS asn"""
+
+# Get the peering LANs of IXPs along with the PeeringDB ID and name of the IXP
+IXP_QUERY = """MATCH (p:PeeringLAN)-[m:MANAGED_BY]->(ixp:IXP)-[:EXTERNAL_ID]->(i:PeeringdbIXID)
+WHERE m.reference_name = $reference_name
+RETURN p.prefix AS prefix, i.id AS id, ixp.name AS name"""
 
 # https://en.wikipedia.org/wiki/Private_network
 priv_lo = re.compile(r"^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
@@ -71,23 +95,34 @@ def location2str(city, region, country):
     return "CT{}, {}, {}".format(city, region, country)
 
 
-def fetch_anycast_prefixes(iyp_url=None, reference_names=None):
-    """Fetch anycast prefixes from the LACeS datasets in IYP."""
+def iyp_query(query, iyp_url=None, **params):
+    """Run a read-only query on IYP and yield the resulting records.
+
+    The connection to IYP is closed once all records are consumed, hence the
+    returned generator should always be fully consumed.
+    """
 
     if GraphDatabase is None:
         raise ImportError("neo4j python driver is required to query IYP")
 
     iyp_url = iyp_url if iyp_url else IYP_URL
-    reference_names = reference_names if reference_names \
-        else LACES_REFERENCE_NAMES
 
-    prefixes = []
     # IYP is publicly readable, no credentials needed
     with GraphDatabase.driver(iyp_url, auth=None) as driver:
         with driver.session() as session:
-            for record in session.run(ANYCAST_QUERY,
-                                      reference_names=reference_names):
-                prefixes.append(record["prefix"])
+            for record in session.run(query, **params):
+                yield record
+
+
+def fetch_anycast_prefixes(iyp_url=None, reference_names=None):
+    """Fetch anycast prefixes from the LACeS datasets in IYP."""
+
+    iyp_url = iyp_url if iyp_url else IYP_URL
+    reference_names = reference_names if reference_names \
+        else LACES_REFERENCE_NAMES
+
+    prefixes = [record["prefix"] for record in iyp_query(
+        ANYCAST_QUERY, iyp_url, reference_names=reference_names)]
 
     logging.info("Fetched {} anycast prefixes from IYP ({})".format(
         len(prefixes), iyp_url))
@@ -95,8 +130,48 @@ def fetch_anycast_prefixes(iyp_url=None, reference_names=None):
     return prefixes
 
 
-def read_anycast_cache(cache_fname, max_age=None):
-    """Read anycast prefixes from the cache file. Return None if the cache is
+def fetch_prefix_asn(iyp_url=None, reference_name=None):
+    """Fetch prefix to ASN mappings from the BGPKIT pfx2as dataset in IYP.
+
+    Return a list of [prefix, asn] pairs. Prefixes originated by several ASes
+    are reported once per AS.
+    """
+
+    iyp_url = iyp_url if iyp_url else IYP_URL
+    reference_name = reference_name if reference_name \
+        else PFX2ASN_REFERENCE_NAME
+
+    prefixes = [[record["prefix"], record["asn"]] for record in iyp_query(
+        PFX2ASN_QUERY, iyp_url, reference_name=reference_name)]
+
+    logging.info("Fetched {} prefix to ASN mappings from IYP ({})".format(
+        len(prefixes), iyp_url))
+
+    return prefixes
+
+
+def fetch_ixp_prefixes(iyp_url=None, reference_name=None):
+    """Fetch IXP peering LANs from the PeeringDB dataset in IYP.
+
+    Return a list of [prefix, peeringdb_ix_id, ixp_name] values.
+    """
+
+    iyp_url = iyp_url if iyp_url else IYP_URL
+    reference_name = reference_name if reference_name \
+        else IXP_REFERENCE_NAME
+
+    prefixes = [[record["prefix"], record["id"], record["name"]]
+                for record in iyp_query(IXP_QUERY, iyp_url,
+                                        reference_name=reference_name)]
+
+    logging.info("Fetched {} IXP peering LANs from IYP ({})".format(
+        len(prefixes), iyp_url))
+
+    return prefixes
+
+
+def read_prefixes_cache(cache_fname, max_age=None):
+    """Read prefixes from the given cache file. Return None if the cache is
     missing, unreadable, or older than max_age."""
 
     if not os.path.exists(cache_fname):
@@ -110,40 +185,21 @@ def read_anycast_cache(cache_fname, max_age=None):
             timestamp = datetime.datetime.fromisoformat(cache["timestamp"])
             age = datetime.datetime.now(datetime.timezone.utc) - timestamp
             if age > max_age:
-                logging.info("Anycast prefixes cache is outdated ({})".format(
-                    cache["timestamp"]))
+                logging.info("Prefixes cache {} is outdated ({})".format(
+                    cache_fname, cache["timestamp"]))
                 return None
 
         return cache["prefixes"]
 
     except (OSError, ValueError, KeyError) as e:
-        logging.warning("Could not read anycast prefixes cache {} ({})".format(
+        logging.warning("Could not read prefixes cache {} ({})".format(
             cache_fname, e))
         return None
 
 
-def get_anycast_prefixes(cache_fname=ANYCAST_CACHE_FNAME,
-                         max_age=ANYCAST_CACHE_MAX_AGE, iyp_url=None,
-                         reference_names=None):
-    """Get anycast prefixes from the cache file or, if the cache is missing or
-    outdated, from IYP.
+def write_prefixes_cache(cache_fname, prefixes):
+    """Save prefixes to the given cache file."""
 
-    Return an empty list if the prefixes can not be retrieved.
-    """
-
-    prefixes = read_anycast_cache(cache_fname, max_age)
-    if prefixes is not None:
-        return prefixes
-
-    try:
-        prefixes = fetch_anycast_prefixes(iyp_url, reference_names)
-    except Exception as e:
-        logging.error("Could not fetch anycast prefixes from IYP ({})".format(e))
-        # Fall back on the cached prefixes even if they are outdated
-        prefixes = read_anycast_cache(cache_fname)
-        return prefixes if prefixes is not None else []
-
-    # Save prefixes to cache
     try:
         dname = os.path.dirname(cache_fname)
         if dname and not os.path.exists(dname):
@@ -155,10 +211,70 @@ def get_anycast_prefixes(cache_fname=ANYCAST_CACHE_FNAME,
                 "timestamp": str(datetime.datetime.now(datetime.timezone.utc))
                 }, fi)
     except OSError as e:
-        logging.warning("Could not write anycast prefixes cache {} ({})".format(
+        logging.warning("Could not write prefixes cache {} ({})".format(
             cache_fname, e))
 
+
+def get_iyp_prefixes(cache_fname, max_age, fetch_func, **kwargs):
+    """Get prefixes from the given cache file or, if the cache is missing or
+    outdated, from IYP with the given fetch function.
+
+    Return an empty list if the prefixes can not be retrieved.
+    """
+
+    prefixes = read_prefixes_cache(cache_fname, max_age)
+    if prefixes is not None:
+        return prefixes
+
+    try:
+        prefixes = fetch_func(**kwargs)
+    except Exception as e:
+        logging.error("Could not fetch data from IYP ({})".format(e))
+        # Fall back on the cached prefixes even if they are outdated
+        prefixes = read_prefixes_cache(cache_fname)
+        return prefixes if prefixes is not None else []
+
+    write_prefixes_cache(cache_fname, prefixes)
+
     return prefixes
+
+
+def get_anycast_prefixes(cache_fname=ANYCAST_CACHE_FNAME,
+                         max_age=ANYCAST_CACHE_MAX_AGE, iyp_url=None,
+                         reference_names=None):
+    """Get anycast prefixes from the cache file or, if the cache is missing or
+    outdated, from IYP.
+
+    Return an empty list if the prefixes can not be retrieved.
+    """
+
+    return get_iyp_prefixes(cache_fname, max_age, fetch_anycast_prefixes,
+                            iyp_url=iyp_url, reference_names=reference_names)
+
+
+def get_prefix_asn(cache_fname=PFX2ASN_CACHE_FNAME,
+                   max_age=PFX2ASN_CACHE_MAX_AGE, iyp_url=None,
+                   reference_name=None):
+    """Get prefix to ASN mappings from the cache file or, if the cache is
+    missing or outdated, from IYP.
+
+    Return an empty list if the mappings can not be retrieved.
+    """
+
+    return get_iyp_prefixes(cache_fname, max_age, fetch_prefix_asn,
+                            iyp_url=iyp_url, reference_name=reference_name)
+
+
+def get_ixp_prefixes(cache_fname=IXP_CACHE_FNAME, max_age=IXP_CACHE_MAX_AGE,
+                     iyp_url=None, reference_name=None):
+    """Get IXP peering LANs from the cache file or, if the cache is missing or
+    outdated, from IYP.
+
+    Return an empty list if the prefixes can not be retrieved.
+    """
+
+    return get_iyp_prefixes(cache_fname, max_age, fetch_ixp_prefixes,
+                            iyp_url=iyp_url, reference_name=reference_name)
 
 
 class AnycastPrefixes():

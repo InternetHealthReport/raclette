@@ -1,6 +1,6 @@
-from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
+from setuptools import setup
+from setuptools.extension import Extension
+from Cython.Build import cythonize
 
 ext_modules=[
         Extension("raclette.tracksaggregator_cy",
@@ -28,6 +28,5 @@ ext_modules=[
 
 setup(
   name = "raclette",
-  cmdclass = {"build_ext": build_ext},
-  ext_modules = ext_modules)
+  ext_modules = cythonize(ext_modules, language_level="3"))
 

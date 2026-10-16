@@ -1,0 +1,38 @@
+[project]
+name = "raclette"
+version = "0.1.0"
+description = "Human-friendly monitoring of Internet delays"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = [
+    "apsw",
+    "confluent-kafka",
+    "cython",
+    "matplotlib",
+    "maxminddb",
+    "msgpack",
+    "neo4j",
+    "numpy",
+    "pandas",
+    "progress",
+    "py-radix",
+    "requests-futures",
+    "reverse-geocoder",
+    "scipy",
+    "setuptools",
+    "statsmodels",
+]
+
+[tool.setuptools]
+# setup.py only builds the Cython extensions in place, no python package is
+# installed, hence there is nothing for setuptools to discover.
+packages = []
+
+[tool.uv]
+# raclette is run from the source directory, it is not installed as a package.
+# The Cython extensions are built in place with:
+#   uv run python setup.py build_ext --inplace
+package = false
+

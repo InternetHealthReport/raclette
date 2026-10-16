@@ -68,15 +68,26 @@ class Raclette():
         except configparser.NoOptionError:
             self.detection_enabled = 0
 
-        self.ip2asn_dir = config.get("lib", "ip2asn_directory")
-        self.ip2asn_db = config.get("lib", "ip2asn_db")
-        self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
-
-        self.ip2asn_kafka_topic = ''
+        # Source of the IP to ASN/IXP mappings, either 'iyp' to get them from
+        # the Internet Yellow Pages or 'file' to read local databases
         try:
-            self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
-        except configparser.NoOptionError:
-            pass
+            self.ip2asn_source = config.get("lib", "ip2asn_source")
+        except (configparser.NoSectionError, configparser.NoOptionError):
+            self.ip2asn_source = 'iyp'
+
+        self.ip2asn_dir = ''
+        self.ip2asn_db = ''
+        self.ip2asn_ixp = ''
+        self.ip2asn_kafka_topic = ''
+        if self.ip2asn_source != 'iyp':
+            self.ip2asn_dir = config.get("lib", "ip2asn_directory")
+            self.ip2asn_db = config.get("lib", "ip2asn_db")
+            self.ip2asn_ixp = config.get("lib", "ip2asn_ixp")
+
+            try:
+                self.ip2asn_kafka_topic = config.get("lib", "ip2asn_kafka_topic")
+            except configparser.NoOptionError:
+                pass
 
         self.tm_window_size = int(config.get("tracksaggregator", "window_size"))
         self.tm_significance_level = float(config.get("tracksaggregator", "significance_level"))
@@ -172,9 +183,14 @@ class Raclette():
                 detector.start()
 
             # Time Track initialisation
-            sys.path.append(self.ip2asn_dir)
-            import ip2asn
-            i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp, self.ip2asn_kafka_topic, KAFKA_HOST)
+            if self.ip2asn_source == 'iyp':
+                # Prefix to ASN and IXP peering LANs from IYP
+                import iyp2asn
+                i2a = iyp2asn.ip2asn()
+            else:
+                sys.path.append(self.ip2asn_dir)
+                import ip2asn
+                i2a = ip2asn.ip2asn(self.ip2asn_db, self.ip2asn_ixp, self.ip2asn_kafka_topic, KAFKA_HOST)
 
             try:
                 timetrack_module = importlib.import_module("timetrack."+self.timetrack_converter)

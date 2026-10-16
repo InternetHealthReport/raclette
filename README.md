@@ -3,8 +3,9 @@
 Raclette simplifies the analysis of numerous traceroute results by merging results and adding semantics. For example, one can use raclette to read millions traceroute results from RIPE Atlas API and then query raclette for delays between “Amsterdam, NL” and “AS15169” (Google) to obtain the median Round Trip Times (RTTs) between all vantage points in Amsterdam and all Google IP addresses found in traceroutes.
 
 ## Requirements
-- Python 3+
-- pip (to install required python libraries)
+- Python 3.9+
+- [uv](https://docs.astral.sh/uv/) (to install python libraries and run raclette)
+- a C/C++ compiler with OpenMP support (to build the Cython extensions)
 
 ## Install
 Get the latest source files:
@@ -12,13 +13,39 @@ Get the latest source files:
 git clone git@github.com:InternetHealthReport/raclette.git
 ```
 
-Install dependencies, install raclette, and feed cache directory:
+Install dependencies in a virtual environment, build the Cython extensions,
+and create the cache directory:
 ```
 cd raclette
-sudo pip3 install -r requirements.txt 
-python3 setup.py build_ext --inplace
-sudo python3 setup.py install
+uv sync
+uv run python setup.py build_ext --inplace
 mkdir cache
+```
+`uv sync` creates the `.venv` directory, there is no need to activate it:
+every command below is run with `uv run`, which uses that environment.
+
+## IP to ASN and IP to IXP mappings
+Router IP addresses are mapped to ASNs and IXPs with data from
+[IYP](https://iyp.iijlab.net/): prefixes originated in BGP come from the
+[BGPKIT pfx2as](https://data.bgpkit.com/pfx2as) dataset (`bgpkit.pfx2asn`) and
+IXP peering LANs come from the [PeeringDB](https://www.peeringdb.com/) dataset
+(`peeringdb.ix`). Prefixes are cached in `cache/pfx2asn.json` (refreshed daily)
+and `cache/ixp_prefixes.json` (refreshed weekly). IXPs are reported with
+negative AS numbers, the absolute value is the PeeringDB ID of the IXP.
+
+This is configured in the `[lib]` section of the configuration file:
+```
+[lib]
+ip2asn_source = iyp
+```
+Set `ip2asn_source = file` to use local databases instead (a RIB dump in
+pickle format and an IXP jsonl file, see `ip2asn_db` and `ip2asn_ixp`), for
+example to analyze past events with the mappings of that time.
+
+The IYP instance used for all datasets can be changed with the `IYP_URL`
+environment variable:
+```
+export IYP_URL=neo4j://iyp-bolt.ihr.live:7687
 ```
 
 ## IP geolocation
@@ -34,16 +61,19 @@ meaningless. Raclette therefore ignores IP addresses that fall in an anycast
 prefix. Anycast prefixes come from the [LACeS anycast
 census](https://manycast.net/) (datasets `utwente.laces_v4` and
 `utwente.laces_v6`), which is fetched from [IYP](https://iyp.iijlab.net/) and
-cached in `cache/anycast_prefixes.json` (refreshed weekly). A different IYP
-instance can be given with the `IYP_URL` environment variable:
-```
-export IYP_URL=neo4j://iyp-bolt.ihr.live:7687
-```
+cached in `cache/anycast_prefixes.json` (refreshed weekly).
 
 RIPE ipmap geolocations can still be used instead (see
 `tools.IpmapGeolocation`), in that case fetch the ipmap data first:
 ```
 wget https://ftp.ripe.net/ripe/ipmap/geolocations-latest -O cache/geolocations_ipmap.csv.bz2 
+```
+
+## Mapping a single IP address
+The mapping modules can be run on their own, for example to check the ASN and
+the IXP of a few IP addresses:
+```
+uv run raclette/iyp2asn.py 8.8.8.8 80.81.192.1
 ```
 
 
@@ -82,6 +112,8 @@ min_tracks = 3
 enable=1
 
 [lib]
+# Read local databases, this analysis needs IP to ASN mappings of 2018
+ip2asn_source = file
 ip2asn_directory = raclette/lib/
 ip2asn_db = data/rib.20180701.pickle
 ip2asn_ixp =
@@ -98,7 +130,7 @@ For this example we save this file to conf/asc-start.conf.
 ### Traceroute analysis
 To download traceroute and compute delays just run the following command:
 ```
-python raclette/raclette.py -C conf/asc-start.conf
+uv run raclette/raclette.py -C conf/asc-start.conf
 ```
 This is going to take about 30 minutes, it downloads four days of traceroutes.
 You can follow the progress in the log file with the following command:
@@ -110,7 +142,7 @@ tail -F results/ASC_start/log_2018-09-02T12:00.log
 All results are stored in a sqlite database. The filename is the one you gave in the configuration file (io/results).
 Raclette comes with a script to easily plot graphs from that database. For example, to plot delays between Melbourne and Singapore use the following commands:
 ```
-python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%'
+uv run raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%'
 ```
 The following graph will be save in the fig/ directory:
 ![SMW3 cut and ASC start](http://ihr.iijlab.net/static/ihr/Melbourne_Singapore_median_expid1_diffrtt_time.png)
@@ -119,7 +151,7 @@ The graph shows delay changes on Sep.3rd due to a submarine cable cut (SMW3) bet
 ### Miscellaneous
 If you have executed raclette.py several times with the same results file. The results for each instance are stored with a different experiment ID (cf. the field expid in the database). To plot with results from the third execution:
 ```
-python raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%' 3
+uv run raclette/plotter.py results/ASC_start/results_2018-09-02T12:00.sql  '%Melbourne%' '%Singapore%' 3
 ```
 
 You can also directly query the database with a sqlite client. The table you want to look at is diffrtt:

@@ -1,8 +1,8 @@
 init:
-	pip install -r requirements.txt
+	uv sync
 
 install:
-	python setup.py build_ext --inplace
+	uv run python setup.py build_ext --inplace
 
 clean:
-	python setup.py clean
+	uv run python setup.py clean
