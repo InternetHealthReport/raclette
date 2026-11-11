@@ -46,6 +46,28 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
 
 
 @cython.boundscheck(False)
+@cython.nonecheck(False)
+def enumerate_loc_pairs(track_rtts):
+    """Enumerate the location pairs of a track.
+
+    Yields exactly the same pairs as enumerate_loc_diffrtt but skips the
+    differential RTT computation. Used by the counting pass of
+    compute_median_diff_rtt.
+    """
+
+    cdef list locs0, locs1
+    cdef str loc0, loc1
+
+    split_locs = [loc_set.split("|") for loc_set, _ in track_rtts]
+
+    for locs0, locs1 in combinations(split_locs, 2):
+        for loc0 in locs0:
+            for loc1 in locs1:
+                if loc0 != loc1:
+                    yield (loc0, loc1)
+
+
+@cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
 cdef double normalized_entropy(long *count, int nbelem) nogil:
@@ -168,9 +190,42 @@ class TracksAggregator():
         cdef PairCounter count
         cdef dict counters = {}
         cdef dict asn_counts
+        cdef dict pair_tracks
+        cdef long nb_pair_tracks
+        cdef int min_tracks = self.min_tracks
+        cdef bint prefiltered = min_tracks > 1
 
         results = {}
         nb_hops_cache = self.nb_hops_cache
+
+        if prefiltered and not isinstance(tracks, (list, tuple)):
+            # the tracks are read twice below, make sure they can be
+            tracks = list(tracks)
+
+        if prefiltered:
+            # First pass: only count how many tracks cross each pair of
+            # locations. Accumulating RTT samples for every pair is what
+            # makes this function run out of memory on large time bins,
+            # while the min_tracks filter discards the vast majority of the
+            # pairs at the very end. Counting first is much cheaper than
+            # computing the differential RTTs, and lets the second pass
+            # allocate data for the surviving pairs only.
+            logging.info("Counting location pairs")
+            pair_tracks = {}
+            for track in tracks:
+                for locations in enumerate_loc_pairs(track["rtts"]):
+                    if locations in pair_tracks:
+                        pair_tracks[locations] += 1
+                    else:
+                        pair_tracks[locations] = 1
+
+            for locations, nb_pair_tracks in pair_tracks.items():
+                if nb_pair_tracks >= min_tracks:
+                    counters[locations] = PairCounter()
+            logging.info("Keeping {} location pairs out of {}".format(
+                len(counters), len(pair_tracks)))
+            pair_tracks = None
+
         logging.info("Computing differential RTTs")
 
         for track in tracks:
@@ -189,6 +244,9 @@ class TracksAggregator():
                 enumerate_loc_diffrtt(nb_hops, track["rtts"]):
                     count = counters.get(locations)
                     if count is None:
+                        if prefiltered:
+                            # dropped by the counting pass
+                            continue
                         count = PairCounter()
                         counters[locations] = count
                     count.diffrtt += diffrtt
@@ -299,7 +357,6 @@ class TracksAggregator():
         PyMem_Free(diffrtt_offset)
         PyMem_Free(entropy_offset)
 
-        min_tracks = self.min_tracks
         for loc_idx, (locations, count) in enumerate(counters.items()):
             if count.nb_tracks<min_tracks:
                 continue
