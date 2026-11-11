@@ -114,6 +114,7 @@ cache/*.json
 
 # ignore ipinfo geolocation database updated by user
 data/*.mmdb
+data/*.mmdb.tmp
 
 # mypy
 .mypy_cache/

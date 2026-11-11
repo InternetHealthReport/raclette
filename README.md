@@ -16,7 +16,6 @@ git clone git@github.com:InternetHealthReport/raclette.git
 Install dependencies in a virtual environment, build the Cython extensions,
 and create the cache directory:
 ```
-cd raclette
 uv sync
 uv run python setup.py build_ext --inplace
 mkdir cache
@@ -54,6 +53,18 @@ mmdb format. By default raclette reads `data/ipinfo_location.mmdb`, a different
 database can be given with the `IPINFO_DB` environment variable:
 ```
 export IPINFO_DB=/path/to/your/ipinfo_location.mmdb
+```
+
+The database is automatically downloaded if it is missing or more than one week
+old. This requires an [IPinfo](https://ipinfo.io/) API token, given with the
+`IPINFO_TOKEN` environment variable:
+```
+export IPINFO_TOKEN=your_ipinfo_token
+```
+If no token is given, or if the download fails, raclette keeps using the local
+database (a warning is logged). The database can also be updated manually:
+```
+python -c "import sys; sys.path.append('raclette'); import tools; tools.download_ipinfo_db()"
 ```
 
 Anycast IP addresses are hosted at multiple locations, so geolocating them is

@@ -13,12 +13,11 @@ from itertools import combinations, product
 import tools
 
 from libc.math cimport log
-from libcpp.algorithm cimport sort as cpp_sort
+from libcpp.algorithm cimport nth_element
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair as cpp_pair
 from cython.operator cimport dereference as deref, preincrement as inc
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
-from libc.stdlib cimport malloc, free
 from cython.parallel import prange
 cimport cython
 
@@ -28,19 +27,22 @@ def enumerate_loc_diffrtt(nb_hops, track_rtts):
     """Enumerate over all locations and compute diffrtt"""
 
     cdef double x1,x0
-    # cdef tuple loc_set0, loc_set1
-    cdef list rtts0, rtts1
+    cdef list rtts0, rtts1, locs0, locs1
     cdef str loc0, loc1
 
-    for hop, ((loc_set0, rtts0),(loc_set1, rtts1)) in \
-            zip(nb_hops, combinations(track_rtts,2)):
+    # split each location set only once instead of once per location pair
+    split_rtts = [(loc_set.split("|"), rtts) for loc_set, rtts in track_rtts]
+
+    for hop, ((locs0, rtts0),(locs1, rtts1)) in \
+            zip(nb_hops, combinations(split_rtts,2)):
         # double for loops are faster than itertools.product
         # diffrtt =  [ x1-x0 for x0, x1 in product(rtts0,rtts1)]
         diffrtt =  [ x1-x0 for x0 in rtts0 for x1 in rtts1]
 
-        [(yield (hop, diffrtt, (loc0, loc1)))
-                for loc0 in loc_set0.split("|")
-                for loc1 in loc_set1.split("|") if loc0!=loc1]
+        for loc0 in locs0:
+            for loc1 in locs1:
+                if loc0 != loc1:
+                    yield (hop, diffrtt, (loc0, loc1))
 
 
 @cython.boundscheck(False)
@@ -52,30 +54,21 @@ cdef double normalized_entropy(long *count, int nbelem) nogil:
     """
 
     cdef Py_ssize_t i
-    cdef double entropyelem
+    cdef double p
     cdef double entropysum = 0
     cdef double countsum = 0
-    cdef double *norm_count = <double*> malloc( nbelem * sizeof(double))
 
     if nbelem < 2:
         return 0.0
 
-    for i in prange(nbelem):
-        countsum+=count[i]
+    for i in range(nbelem):
+        countsum += count[i]
 
-    # normalize
-    for i in prange(nbelem):
-        norm_count[i] = count[i]/countsum
-
-        # entropy element-wise
-        if norm_count[i]<=0:
-            entropyelem=0
-        else:
-            entropyelem = -norm_count[i]*log(norm_count[i])
-
-        entropysum += entropyelem
-
-    free(norm_count)
+    for i in range(nbelem):
+        # entropy element-wise, skipping empty bins (log(0) undefined)
+        if count[i] > 0:
+            p = count[i]/countsum
+            entropysum -= p*log(p)
 
     return entropysum/log(nbelem)
 
@@ -103,12 +96,13 @@ class TracksAggregator():
         """Add a new track to the history."""
 
         cdef double win_size = self.window_size
-        cdef long ts = track["timestamp"]
+        cdef long ts
 
         if not track :
             self.nb_empty_tracks += 1
             return
 
+        ts = track["timestamp"]
         bin_id = int(ts/win_size)
 
         if self.msm_bin[track['msm_id']] > bin_id \
@@ -199,21 +193,48 @@ class TracksAggregator():
                 nblocations * sizeof(int))
         cdef double *entropy_values =  <double *> PyMem_Malloc(
                 nblocations * sizeof(double))
+        cdef double *min_values =  <double *> PyMem_Malloc(
+                nblocations * sizeof(double))
         cdef double [:] tmp_array
         cdef long [:] tmp_ent
         cdef int loc_idx
+        cdef double *begin
+        cdef double *end
+        cdef double minval
+        cdef Py_ssize_t nbelem, j
+
+        # keep a reference to the entropy arrays so they are not garbage
+        # collected before the prange loop below uses their data pointers
+        entropy_refs = []
 
         for loc_idx, x in enumerate(counters.values()):
             tmp_array = x["diffrtt"]
             array_diffrtt[loc_idx*2] = &tmp_array[0]
             array_diffrtt[loc_idx*2+1] = &tmp_array[tmp_array.shape[0]]
 
-            tmp_ent = np.asarray(list(x["nb_tracks_per_asn"].values()))
+            ent_arr = np.asarray(list(x["nb_tracks_per_asn"].values()))
+            entropy_refs.append(ent_arr)
+            tmp_ent = ent_arr
             array_entropy[loc_idx] = &tmp_ent[0]
             array_entropy_size[loc_idx] = tmp_ent.shape[0]
 
         for loc_idx in prange(nblocations, nogil=True):
-            cpp_sort(array_diffrtt[loc_idx*2], array_diffrtt[loc_idx*2+1])
+            begin = array_diffrtt[loc_idx*2]
+            end = array_diffrtt[loc_idx*2+1]
+            nbelem = end - begin
+            if nbelem > 0:
+                # partial sort: only place the median at its final position
+                # (O(n) instead of O(n log n) for a full sort)
+                nth_element(begin, begin + nbelem//2, end)
+                # elements before the median position are all <= median,
+                # so the minimum is among the first nbelem//2+1 elements
+                minval = begin[0]
+                for j in range(1, nbelem//2 + 1):
+                    if begin[j] < minval:
+                        minval = begin[j]
+                min_values[loc_idx] = minval
+            else:
+                min_values[loc_idx] = 0
             entropy_values[loc_idx] = normalized_entropy(
                     array_entropy[loc_idx], array_entropy_size[loc_idx])
 
@@ -228,16 +249,13 @@ class TracksAggregator():
 
             diff_rtt_values = count["diffrtt"]
             nbsamples = diff_rtt_values.shape[0]
-            # these 2 steps are precomuped in parallel before this loop
-            # inplace_sort(diff_rtt_values, nbsamples)
-            # tmp_ent = np.array(list(count["nb_tracks_per_asn"].values()),dtype=np.int64,copy=False)
-            # entropy =  normalized_entropy(tmp_ent)
-
+            # median, min and entropy are precomputed in parallel before
+            # this loop
             entropy = entropy_values[loc_idx]
 
             results[locations] = {
                     "median": count["diffrtt"][int(nbsamples/2)],
-                    "min": count["diffrtt"][0],
+                    "min": min_values[loc_idx],
                     "nb_tracks": count["nb_tracks"],
                     "nb_samples": count["nb_samples"],
                     "nb_probes": len(count["unique_probes"]),
@@ -247,6 +265,7 @@ class TracksAggregator():
                     }
 
         PyMem_Free(entropy_values)
+        PyMem_Free(min_values)
 
         return results
 
@@ -260,7 +279,13 @@ class TracksAggregator():
 
         logging.debug("Running results collection")
         expired_bins = []
-        min_processed_bin = min(self.msm_bin.values())
+
+        if not self.track_bins:
+            logging.warning("No track to aggregate")
+            return results
+
+        # msm_bin may be empty if no track was ever added
+        min_processed_bin = min(self.msm_bin.values(), default=0)
 
         for date, tracks in self.track_bins.items():
 

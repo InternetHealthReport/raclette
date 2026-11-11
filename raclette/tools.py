@@ -21,6 +21,14 @@ except ImportError:
 # IPINFO_DB environment variable.
 IPINFO_DB = os.environ.get("IPINFO_DB", "data/ipinfo_location.mmdb")
 
+# The IPinfo database is automatically downloaded from this URL when it is
+# missing or older than IPINFO_DB_MAX_AGE. This requires an IPinfo API token,
+# which is read from the IPINFO_TOKEN environment variable.
+IPINFO_DB_URL = "https://ipinfo.io/data/ipinfo_location.mmdb"
+IPINFO_DB_MAX_AGE = datetime.timedelta(days=7)
+IPINFO_DOWNLOAD_CHUNK_SIZE = 1024*1024
+IPINFO_DOWNLOAD_TIMEOUT = 60
+
 # Minimum score for ipmap geolocations (legacy)
 IPMAP_MIN_SCORE = 50
 
@@ -312,6 +320,108 @@ class AnycastPrefixes():
         return len(self.rtree.prefixes())
 
 
+def ipinfo_db_age(db_fname):
+    """Return the age of the given IPinfo database as a timedelta, or None if
+    the database does not exist."""
+
+    if not os.path.exists(db_fname):
+        return None
+
+    mtime = datetime.datetime.fromtimestamp(
+            os.path.getmtime(db_fname), datetime.timezone.utc)
+
+    return datetime.datetime.now(datetime.timezone.utc) - mtime
+
+
+def download_ipinfo_db(db_fname=None, token=None):
+    """Download the IPinfo geolocation database (mmdb format).
+
+    The token is read from the IPINFO_TOKEN environment variable if it is not
+    given. The database is downloaded to a temporary file and checked before
+    replacing the current database, so that a failed download never leaves a
+    corrupted database behind.
+
+    Return True if the database was successfully downloaded.
+    """
+
+    db_fname = db_fname if db_fname else IPINFO_DB
+    token = token if token else os.environ.get("IPINFO_TOKEN", "")
+
+    if not token:
+        logging.warning("No IPinfo token found, the geolocation database can "
+                        "not be downloaded. Set the IPINFO_TOKEN environment "
+                        "variable to enable automatic updates.")
+        return False
+
+    tmp_fname = db_fname + ".tmp"
+
+    try:
+        dname = os.path.dirname(db_fname)
+        if dname and not os.path.exists(dname):
+            os.makedirs(dname)
+
+        logging.info("Downloading IPinfo database to {}".format(db_fname))
+        # the token is passed as a parameter so that it is not printed in logs
+        with requests.get(IPINFO_DB_URL,
+                          params={"_src": "frontend", "token": token},
+                          stream=True,
+                          timeout=IPINFO_DOWNLOAD_TIMEOUT) as resp:
+            resp.raise_for_status()
+
+            with open(tmp_fname, "wb") as fi:
+                for chunk in resp.iter_content(IPINFO_DOWNLOAD_CHUNK_SIZE):
+                    fi.write(chunk)
+
+        # Make sure the downloaded file is a valid database before replacing
+        # the current one
+        with maxminddb.open_database(tmp_fname):
+            pass
+
+        os.replace(tmp_fname, db_fname)
+        logging.info("Updated IPinfo database {} ({} bytes)".format(
+            db_fname, os.path.getsize(db_fname)))
+
+        return True
+
+    except (requests.RequestException, OSError,
+            maxminddb.InvalidDatabaseError) as e:
+        logging.error("Could not download IPinfo database ({})".format(e))
+
+        if os.path.exists(tmp_fname):
+            try:
+                os.remove(tmp_fname)
+            except OSError:
+                pass
+
+        return False
+
+
+def update_ipinfo_db(db_fname=None, max_age=IPINFO_DB_MAX_AGE, token=None):
+    """Download the IPinfo database if it is missing or older than max_age.
+
+    The previous database is kept if the download fails, so that raclette can
+    still geolocate IP addresses with a slightly outdated database.
+
+    Return the database filename.
+    """
+
+    db_fname = db_fname if db_fname else IPINFO_DB
+
+    age = ipinfo_db_age(db_fname)
+    if age is None:
+        logging.info("No IPinfo database found at {}".format(db_fname))
+    elif max_age is not None and age > max_age:
+        logging.info("IPinfo database {} is outdated ({} days old)".format(
+            db_fname, age.days))
+    else:
+        # the database is recent enough
+        return db_fname
+
+    download_ipinfo_db(db_fname, token)
+
+    return db_fname
+
+
 class Geolocation():
     """Geolocate IP addresses with an IPinfo database (mmdb format).
 
@@ -321,12 +431,20 @@ class Geolocation():
     Anycast IP addresses are hosted at multiple locations, hence they are not
     geolocated. Set ignore_anycast to False to geolocate them anyway, or give
     an AnycastPrefixes object to reuse already fetched prefixes.
+
+    The database is automatically downloaded if it is missing or older than
+    max_age (one week by default). Set auto_update to False to always use the
+    local database.
     """
 
-    def __init__(self, db_fname=None, anycast=None, ignore_anycast=True):
+    def __init__(self, db_fname=None, anycast=None, ignore_anycast=True,
+                 auto_update=True, max_age=IPINFO_DB_MAX_AGE, token=None):
 
         self.db_fname = db_fname if db_fname else IPINFO_DB
         self.reader = None
+
+        if auto_update:
+            update_ipinfo_db(self.db_fname, max_age, token)
 
         self.anycast = anycast
         if self.anycast is None and ignore_anycast:
